@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Registros</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='history.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Estética original restaurada */
+        .record-details {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-left: 6px solid #FFAF33;
+        }
+        .media-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .media-item img, .media-item video {
+            width: 120px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+        .equipos-section {
+            margin-top: 10px;
+            background: #fff9f0;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px dashed #FFAF33;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Vihesa" class="logo">
+        </div>
+        <div class="header-info" style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
+            <h1 style="color: #333;">{{ proyecto[0] }}</h1>
+            <p>Cliente: {{ proyecto[1] }}</p>
+        </div>
+
+        <div class="records-container" style="padding: 0 20px;">
+            {% if reportes %}
+                {% for registro in reportes %}
+                <div class="record-details">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                        <h3 style="margin: 0; color: #FFAF33;">Actividad: {{ registro.actividad }}</h3>
+                        <span style="color: #666; font-weight: bold;"><i class="far fa-calendar-alt"></i> {{ registro.fecha }}</span>
+                    </div>
+
+                    <div style="margin-top: 15px;">
+                        <p><strong>Descripción:</strong> {{ registro.descripcion }}</p>
+                        <div style="display: flex; gap: 20px; background: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #eee;">
+                            <span><strong>Estado:</strong> {{ registro.estado }}</span>
+                            <span><strong>Avance:</strong> {{ registro.avance }}%</span>
+                        </div>
+                    </div>
+
+                    <div class="media-gallery" style="margin-top: 15px;">
+                        {% for foto in registro.fotos %}
+                        <div class="media-item" style="text-align: center;">
+                            <img src="data:image/png;base64,{{ foto.base64 }}" onclick="window.open(this.src)" title="{{ foto.desc }}">
+                            {% if foto.desc %}
+                                <p style="font-size: 10px; color: #888; margin-top: 5px;">{{ foto.desc }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div style="text-align: center; padding: 50px; color: #999;">
+                    <i class="fas fa-folder-open fa-3x"></i>
+                    <p>No hay reportes registrados para este proyecto.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="bottom-menu" style="text-align: center; margin: 30px 0;">
+            <a href="{{ url_for('history') }}" class="bottom-button" style="background: #FFAF33; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
+                <i class="fas fa-arrow-left"></i> Volver a Proyectos
+            </a>
+        </div>
+    </div>
+</body>
+</html>
