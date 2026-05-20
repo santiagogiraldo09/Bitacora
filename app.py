@@ -787,6 +787,169 @@ def obtener_id_por_numero(token, numero):
     print(f"No se encontró ningún formulario con el número: {numero}")
     return None, None
 
+def insert_informe_diario(id_proyecto, user_id, datos, notas):
+    """
+    Inserta en cascada:
+      1. informe_diario        → 1 fila (encabezado)
+      2. notas_informe_diario  → N filas (una por nota general)
+      3. fotos_nota_diario     → M filas (fotos de cada nota)
+ 
+    Parámetros:
+        id_proyecto  (int)   – FK a proyectosTerranovus
+        user_id      (int)   – FK a usuario
+        datos        (dict)  – {materiales, obs_seguridad, obs_calidad,
+                                fecha_estimada_cierre, porcentaje_avance}
+        notas        (list)  – [{numero_nota, descripcion, fotos: [{file_data, description}]}]
+    """
+    conn = None
+    try:
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+ 
+        # ── 1. Insertar encabezado del informe ──────────────────
+        cursor.execute("""
+            INSERT INTO informe_diario (
+                id_proyecto,
+                user_id,
+                materiales,
+                obs_seguridad,
+                obs_calidad,
+                fecha_estimada_cierre,
+                porcentaje_avance
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id_informe
+        """, (
+            id_proyecto,
+            user_id,
+            datos.get('materiales'),
+            datos.get('obs_seguridad'),
+            datos.get('obs_calidad'),
+            datos.get('fecha_estimada_cierre') or None,   # None si viene vacío ''
+            datos.get('porcentaje_avance') or 0
+        ))
+        id_informe = cursor.fetchone()[0]
+ 
+        # ── 2. Insertar cada nota general ───────────────────────
+        for nota in notas or []:
+            cursor.execute("""
+                INSERT INTO notas_informe_diario (
+                    id_informe,
+                    numero_nota,
+                    descripcion
+                ) VALUES (%s, %s, %s)
+                RETURNING id_nota
+            """, (
+                id_informe,
+                nota.get('numero_nota'),
+                nota.get('descripcion', '')
+            ))
+            id_nota = cursor.fetchone()[0]
+ 
+            # ── 3. Insertar fotos de esta nota ───────────────
+            for foto in nota.get('fotos', []):
+                cursor.execute("""
+                    INSERT INTO fotos_nota_diario (
+                        id_nota,
+                        imagen_base64,
+                        description
+                    ) VALUES (%s, %s, %s)
+                """, (
+                    id_nota,
+                    foto.get('file_data'),
+                    foto.get('description', '')
+                ))
+ 
+        conn.commit()
+        print(f"✅ Informe diario {id_informe} guardado correctamente.")
+        return id_informe
+ 
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        print(f"❌ Error de BD al guardar informe: {e}")
+        raise e
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/guardar_informe_diario', methods=['POST'])
+def guardar_informe_diario():
+    """
+    Endpoint POST que recibe:
+    {
+        "id_proyecto":           "12",
+        "materiales":            "Tuberías PVC 4 pulgadas...",
+        "obs_seguridad":         "Uso de EPP verificado...",
+        "obs_calidad":           "Sin novedades...",
+        "fecha_estimada_cierre": "2025-08-30",    ← puede ser null
+        "porcentaje_avance":     "45",
+        "notas": [
+            {
+                "numero_nota": 1,
+                "descripcion": "Desmantelamiento estantería...",
+                "fotos": [
+                    { "file_data": "data:image/jpeg;base64,...", "description": "" }
+                ]
+            }
+        ]
+    }
+    """
+    conn = None
+    try:
+        data       = request.get_json()
+        user_id    = session.get('user_id')
+        id_proyecto = data.get('id_proyecto')
+ 
+        # ── Validaciones básicas ────────────────────────────
+        if not user_id:
+            return jsonify({"status": "error", "error": "Sesión no válida"}), 401
+ 
+        if not id_proyecto:
+            return jsonify({"status": "error", "error": "Falta id_proyecto"}), 400
+ 
+        notas = data.get('notas', [])
+ 
+        # Al menos un campo con contenido
+        tiene_contenido = any([
+            data.get('materiales'),
+            data.get('obs_seguridad'),
+            data.get('obs_calidad'),
+            data.get('fecha_estimada_cierre'),
+            data.get('porcentaje_avance'),
+            len(notas) > 0
+        ])
+        if not tiene_contenido:
+            return jsonify({
+                "status": "error",
+                "error": "El formulario está vacío. Completa al menos un campo."
+            }), 400
+ 
+        # ── Guardar en BD ───────────────────────────────────
+        id_informe = insert_informe_diario(
+            id_proyecto = int(id_proyecto),
+            user_id     = user_id,
+            datos       = {
+                'materiales':            data.get('materiales'),
+                'obs_seguridad':         data.get('obs_seguridad'),
+                'obs_calidad':           data.get('obs_calidad'),
+                'fecha_estimada_cierre': data.get('fecha_estimada_cierre'),
+                'porcentaje_avance':     data.get('porcentaje_avance')
+            },
+            notas = notas
+        )
+ 
+        return jsonify({
+            "status":     "success",
+            "message":    "Informe diario guardado correctamente.",
+            "id_informe": id_informe
+        }), 201
+ 
+    except Exception as e:
+        print(f"❌ Error en /guardar_informe_diario: {e}")
+        traceback.print_exc()
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
 @app.route('/formulario-synchro')
 def formulario_synchro():
     if 'user_id' not in session:
