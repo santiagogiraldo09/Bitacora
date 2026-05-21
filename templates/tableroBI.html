@@ -2,85 +2,421 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Tablero BI - Terranovus</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablero BI - Informes Diarios</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='history.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* ── Layout base ── */
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;        /* evita doble scroll en body */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        /* Contenedor blanco principal — más ancho */
+        .main-container {
+            width: 100%;
+            max-width: 720px;        /* antes history.css lo limitaba a ~600px */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.12);
+            border-radius: 0;
+            margin: 0 auto;
+            overflow: hidden;        /* el scroll lo maneja .scroll-area */
+        }
+
+        /* Zona de scroll: todo excepto el botón fijo */
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 10px;
+        }
+
+        /* En tablets/escritorio dejamos un poco de margen lateral */
+        @media (min-width: 480px) {
+            body { padding: 20px 16px; }
+            .main-container {
+                height: calc(100vh - 40px);
+                border-radius: 12px;
+                overflow: hidden;
+            }
+        }
+
+        /* ── KPI cards ── */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            padding: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            padding: 20px 20px 0;
         }
         .kpi-card {
             background: white;
-            padding: 20px;
+            padding: 18px 12px;
             border-radius: 10px;
             text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.09);
             border-top: 5px solid #FFAF33;
         }
-        .chart-container {
-            background: white;
-            margin: 20px;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        .kpi-card h4 {
+            margin: 0 0 8px 0;
+            color: #666;
+            font-size: 0.82em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
+        .kpi-card .kpi-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+            line-height: 1;
+        }
+        .kpi-card .kpi-value.orange { color: #FFAF33; }
+
+        /* ── Secciones de contenido ── */
+        .section-block {
+            background: white;
+            margin: 16px 20px;
+            padding: 18px;
+            border-radius: 10px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.09);
+        }
+        .section-block h3 {
+            margin: 0 0 14px 0;
+            color: #333;
+            font-size: 0.95em;
+            border-bottom: 2px solid #FFAF33;
+            padding-bottom: 8px;
+        }
+
+        /* ── Tarjetas de informes recientes (reemplaza tabla) ── */
+        .informe-card {
+            background: #fff8f0;
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            border-left: 4px solid #FFAF33;
+        }
+        .informe-card .inf-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+        .informe-card .inf-proyecto {
+            font-weight: 700;
+            font-size: 0.92em;
+            color: #333;
+        }
+        .informe-card .inf-fecha {
+            font-size: 0.76em;
+            color: #888;
+        }
+        .informe-card .inf-meta {
+            font-size: 0.78em;
+            color: #777;
+            margin-bottom: 6px;
+        }
+        /* ── Barra de avance ── */
+        .avance-mini {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .avance-mini .bar-bg {
+            flex: 1;
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .avance-mini .bar-fill {
+            height: 100%;
+            background: #FFAF33;
+            border-radius: 5px;
+            transition: width 0.4s ease;
+        }
+        .avance-mini .pct {
+            font-weight: bold;
+            color: #FFAF33;
+            min-width: 38px;
+            font-size: 0.88em;
+            text-align: right;
+        }
+
+        /* ── Tarjetas de notas ── */
+        .nota-card {
+            background: #fff8f0;
+            border-left: 4px solid #FFAF33;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 10px;
+        }
+        .nota-card .nota-proyecto {
+            font-size: 0.75em;
+            color: #888;
+            margin-bottom: 3px;
+        }
+        .nota-card .nota-texto {
+            font-size: 0.88em;
+            color: #333;
+        }
+
+        /* ── Tarjetas de observaciones ── */
+        .obs-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        @media (max-width: 480px) { .obs-grid { grid-template-columns: 1fr; } }
+        .obs-card {
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 0.83em;
+        }
+        .obs-card.seguridad { background: #fff3cd; border-left: 4px solid #f0ad4e; }
+        .obs-card.calidad   { background: #d4edda; border-left: 4px solid #28a745; }
+        .obs-card .obs-label {
+            font-weight: 700;
+            font-size: 0.78em;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 4px;
+        }
+        .obs-card.seguridad .obs-label { color: #856404; }
+        .obs-card.calidad   .obs-label { color: #155724; }
+        .obs-card .obs-proyecto { font-size: 0.75em; color: #888; margin-bottom: 3px; }
+        .obs-card .obs-texto { color: #444; }
+
+        /* ── Sin datos ── */
+        .sin-datos {
+            text-align: center;
+            color: #aaa;
+            padding: 20px;
+            font-size: 0.88em;
+        }
+
+        /* ── Botón volver — FIJO al fondo del contenedor ── */
+        .volver-btn {
+            flex-shrink: 0;          /* nunca se encoge */
+            display: block;
+            /*width: 100%;*/
+            margin: 12px 40px 18px;
+            border-radius: 15px;
+            padding: 15px;
+            background: #FFAF33;
+            color: white;
+            border: none;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            letter-spacing: 0.3px;
+            /*border-top: 1px solid rgba(0,0,0,0.08);*/
+        }
+        .volver-btn:hover { background: #e09a20; }
     </style>
 </head>
-<body style="background-color: #f4f4f9;">
-    <div class="main-container">
-        <h2 style="text-align: center; color: #333;">Indicadores de Gestión</h2>
-        
-        <div class="dashboard-grid">
-            <div class="kpi-card">
-                <h3>Proyectos</h3>
-                <p style="font-size: 2em; font-weight: bold;">{{ total_p }}</p>
-            </div>
-            <div class="kpi-card">
-                <h3>Actividades</h3>
-                <p style="font-size: 2em; font-weight: bold;">{{ total_r }}</p>
-            </div>
-            <div class="kpi-card">
-                <h3>Avance Global</h3>
-                <p style="font-size: 2em; font-weight: bold; color: #FFAF33;">{{ promedio }}%</p>
-            </div>
-        </div>
+<body>
+<div class="main-container">
 
-        <div class="chart-container">
-            <canvas id="estadoChart"></canvas>
-        </div>
+    <!-- Todo el contenido desplazable va dentro de .scroll-area -->
+    <div class="scroll-area">
 
-        <div class="bottom-menu" style="text-align: center;">
-            <a href="{{ url_for('history') }}" class="back-button" style="text-decoration: none; display: inline-block; width: 200px; background-color: #FFAF33;">
-                Volver
-            </a>
+    <h2 style="text-align:center; color:#333; padding:20px 20px 8px; margin:0;">
+        <i class="fas fa-chart-bar" style="color:#FFAF33;"></i> Tablero de Gestión
+    </h2>
+
+    <!-- ══════════════════════════════════════
+         KPIs GLOBALES
+    ══════════════════════════════════════ -->
+    <div class="dashboard-grid">
+        <div class="kpi-card">
+            <h4><i class="fas fa-folder-open"></i> Proyectos</h4>
+            <div class="kpi-value">{{ total_p }}</div>
+        </div>
+        <div class="kpi-card">
+            <h4><i class="fas fa-file-alt"></i> Informes</h4>
+            <div class="kpi-value">{{ total_informes }}</div>
+        </div>
+        <div class="kpi-card">
+            <h4><i class="fas fa-clipboard-list"></i> Notas</h4>
+            <div class="kpi-value">{{ total_notas }}</div>
+        </div>
+        <div class="kpi-card">
+            <h4><i class="fas fa-percentage"></i> Avance Prom.</h4>
+            <div class="kpi-value orange">{{ promedio }}%</div>
         </div>
     </div>
 
-    <script>
-        // Configuración del gráfico de estados
-        const ctx = document.getElementById('estadoChart').getContext('2d');
-        const dataEstados = {{ datos_estados | tojson }};
-        
-        new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: Object.keys(dataEstados),
-                datasets: [{
-                    label: 'Actividades por Estado',
-                    data: Object.values(dataEstados),
-                    backgroundColor: ['#FFAF33', '#3498db', '#2ecc71', '#e74c3c', '#9b59b6']
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: { display: true, text: 'Distribución de Actividades por Estado' }
+    <!-- ══════════════════════════════════════
+         GRÁFICO: AVANCE POR PROYECTO
+    ══════════════════════════════════════ -->
+    {% if avance_por_proyecto %}
+    <div class="section-block">
+        <h3><i class="fas fa-tasks"></i> Avance por Proyecto</h3>
+        <canvas id="avanceChart"></canvas>
+    </div>
+    {% endif %}
+
+    <!-- ══════════════════════════════════════
+         TABLA: ÚLTIMOS INFORMES
+    ══════════════════════════════════════ -->
+    <div class="section-block">
+        <h3><i class="fas fa-calendar-check"></i> Últimos Informes Diarios</h3>
+        {% if informes_recientes %}
+            {% for inf in informes_recientes %}
+            <div class="informe-card">
+                <div class="inf-header">
+                    <span class="inf-proyecto">{{ inf.proyecto }}</span>
+                    <span class="inf-fecha">{{ inf.fecha }}</span>
+                </div>
+                {% if inf.fecha_cierre %}
+                <div class="inf-meta">
+                    <i class="fas fa-calendar-alt" style="color:#FFAF33;"></i>
+                    Cierre estimado: <strong>{{ inf.fecha_cierre }}</strong>
+                </div>
+                {% endif %}
+                <div class="avance-mini">
+                    <div class="bar-bg">
+                        <div class="bar-fill" style="width:{{ inf.avance }}%;"></div>
+                    </div>
+                    <span class="pct">{{ inf.avance }}%</span>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <p class="sin-datos">No hay informes registrados aún.</p>
+        {% endif %}
+    </div>
+
+    <!-- ══════════════════════════════════════
+         NOTAS GENERALES RECIENTES
+    ══════════════════════════════════════ -->
+    <div class="section-block">
+        <h3><i class="fas fa-sticky-note"></i> Notas Recientes</h3>
+        {% if notas_recientes %}
+            {% for nota in notas_recientes %}
+            <div class="nota-card">
+                <div class="nota-proyecto">
+                    <i class="fas fa-folder" style="color:#FFAF33;"></i>
+                    {{ nota.proyecto }} &nbsp;·&nbsp; {{ nota.fecha }}
+                </div>
+                <div class="nota-texto">{{ nota.descripcion }}</div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <p class="sin-datos">No hay notas registradas aún.</p>
+        {% endif %}
+    </div>
+
+    <!-- ══════════════════════════════════════
+         OBSERVACIONES SEGURIDAD Y CALIDAD
+    ══════════════════════════════════════ -->
+    <div class="section-block">
+        <h3><i class="fas fa-shield-alt"></i> Observaciones Recientes</h3>
+        {% if obs_recientes %}
+        <div class="obs-grid">
+            {% for obs in obs_recientes %}
+                {% if obs.seguridad %}
+                <div class="obs-card seguridad">
+                    <div class="obs-label"><i class="fas fa-hard-hat"></i> Seguridad</div>
+                    <div class="obs-proyecto">{{ obs.proyecto }} · {{ obs.fecha }}</div>
+                    <div class="obs-texto">{{ obs.seguridad }}</div>
+                </div>
+                {% endif %}
+                {% if obs.calidad %}
+                <div class="obs-card calidad">
+                    <div class="obs-label"><i class="fas fa-check-circle"></i> Calidad</div>
+                    <div class="obs-proyecto">{{ obs.proyecto }} · {{ obs.fecha }}</div>
+                    <div class="obs-texto">{{ obs.calidad }}</div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="sin-datos">No hay observaciones registradas aún.</p>
+        {% endif %}
+    </div>
+
+    </div><!-- /.scroll-area -->
+
+    <!-- Botón fijo al fondo — fuera del scroll-area -->
+    <a href="{{ url_for('history') }}" class="volver-btn">
+        <i class="fas fa-arrow-left"></i> Volver a Proyectos
+    </a>
+
+</div><!-- /.main-container -->
+
+<script>
+    {% if avance_por_proyecto %}
+    // Gráfico de barras HORIZONTAL: avance por proyecto
+    const ctxAvance = document.getElementById('avanceChart').getContext('2d');
+    const avanceData = {{ avance_por_proyecto | tojson }};
+
+    // Altura dinámica: 56px por proyecto, mínimo 120px
+    const chartHeight = Math.max(120, avanceData.length * 56);
+    document.getElementById('avanceChart').parentElement.style.height = chartHeight + 'px';
+    document.getElementById('avanceChart').style.height = chartHeight + 'px';
+
+    new Chart(ctxAvance, {
+        type: 'bar',
+        data: {
+            labels: avanceData.map(d => d.proyecto),
+            datasets: [{
+                label: '% de Avance',
+                data: avanceData.map(d => d.avance),
+                backgroundColor: avanceData.map(d =>
+                    d.avance >= 75 ? '#2ecc71' :
+                    d.avance >= 40 ? '#FFAF33' : '#e74c3c'
+                ),
+                borderRadius: 5,
+                borderSkipped: false,
+                barThickness: 28
+            }]
+        },
+        options: {
+            indexAxis: 'y',          // ← barras horizontales
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { callback: v => v + '%', font: { size: 11 } },
+                    grid: { color: '#f0f0f0' }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { font: { size: 12 }, color: '#444' }
                 }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => '  Avance: ' + ctx.parsed.x + '%'
+                    }
+                },
+                // Etiquetas de valor al final de cada barra
+                datalabels: false
             }
-        });
-    </script>
+        }
+    });
+    {% endif %}
+</script>
 </body>
 </html>

@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Historial de Registros</title>
+    <title>Historial de Informes</title>
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
     <link rel="stylesheet" href="{{ url_for('static', filename='history.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        /* Estética original restaurada */
+        /* ── Tarjeta principal de cada informe ── */
         .record-details {
             background-color: #ffffff;
             border-radius: 8px;
@@ -17,81 +17,275 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             border-left: 6px solid #FFAF33;
         }
+
+        /* ── Encabezado del informe ── */
+        .inf-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+        }
+        .inf-header .inf-num {
+            margin: 0;
+            color: #FFAF33;
+            font-size: 1em;
+        }
+        .inf-header .inf-fecha {
+            color: #666;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        /* ── Barra de avance ── */
+        .avance-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f9f9f9;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            margin-bottom: 12px;
+        }
+        .avance-row .avance-label { font-weight: bold; font-size: 0.88em; color: #555; white-space: nowrap; }
+        .avance-bar-bg { flex: 1; height: 10px; background: #e0e0e0; border-radius: 5px; overflow: hidden; }
+        .avance-bar-fill { height: 100%; background: #FFAF33; border-radius: 5px; }
+        .avance-pct { font-weight: bold; color: #FFAF33; min-width: 38px; text-align: right; font-size: 0.9em; }
+
+        /* ── Campos de texto simples ── */
+        .campo-bloque {
+            margin-bottom: 10px;
+        }
+        .campo-bloque .campo-label {
+            font-weight: bold;
+            font-size: 0.82em;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #888;
+            margin-bottom: 3px;
+        }
+        .campo-bloque .campo-valor {
+            font-size: 0.92em;
+            color: #333;
+            background: #fafafa;
+            padding: 8px 10px;
+            border-radius: 5px;
+            border: 1px solid #f0f0f0;
+        }
+
+        /* ── Fila con dos campos lado a lado ── */
+        .campos-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 10px;
+            align-items: flex-end;
+        }
+        .campos-row .campo-bloque { flex: 1; }
+
+        /* ── Separador de sección de notas ── */
+        .notas-section {
+            margin-top: 14px;
+            border-top: 2px dashed #FFD98A;
+            padding-top: 12px;
+        }
+        .notas-section-title {
+            font-weight: bold;
+            font-size: 0.88em;
+            text-transform: uppercase;
+            color: #FFAF33;
+            letter-spacing: 0.4px;
+            margin-bottom: 10px;
+        }
+
+        /* ── Cada nota dentro del informe ── */
+        .nota-item {
+            background: #fff8f0;
+            border-left: 3px solid #FFAF33;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+        .nota-item .nota-num {
+            font-size: 0.78em;
+            font-weight: bold;
+            color: #FFAF33;
+            margin-bottom: 4px;
+        }
+        .nota-item .nota-desc {
+            font-size: 0.9em;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        /* ── Galería de fotos de cada nota ── */
         .media-gallery {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 8px;
+            margin-top: 6px;
         }
-        .media-item img, .media-item video {
-            width: 120px;
-            height: 120px;
+        .media-item { text-align: center; }
+        .media-item img {
+            width: 110px;
+            height: 110px;
             object-fit: cover;
-            border-radius: 5px;
+            border-radius: 6px;
             border: 1px solid #ddd;
             cursor: pointer;
+            transition: transform 0.2s;
         }
-        .equipos-section {
-            margin-top: 10px;
-            background: #fff9f0;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px dashed #FFAF33;
+        .media-item img:hover { transform: scale(1.04); }
+        .media-item .foto-desc {
+            font-size: 10px;
+            color: #888;
+            margin-top: 4px;
+            max-width: 110px;
         }
+
+        /* ── Chip para observaciones ── */
+        .obs-chip {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-right: 4px;
+        }
+        .obs-chip.seg { background: #fff3cd; color: #856404; }
+        .obs-chip.cal { background: #d4edda; color: #155724; }
     </style>
 </head>
 <body>
-    <div class="main-container">
-        <div class="logo-container">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Vihesa" class="logo">
-        </div>
-        <div class="header-info" style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
-            <h1 style="color: #333;">{{ proyecto[0] }}</h1>
-            <p>Cliente: {{ proyecto[1] }}</p>
-        </div>
+<div class="main-container">
 
-        <div class="records-container" style="padding: 0 20px;">
-            {% if reportes %}
-                {% for registro in reportes %}
-                <div class="record-details">
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-                        <h3 style="margin: 0; color: #FFAF33;">Actividad: {{ registro.actividad }}</h3>
-                        <span style="color: #666; font-weight: bold;"><i class="far fa-calendar-alt"></i> {{ registro.fecha }}</span>
-                    </div>
-
-                    <div style="margin-top: 15px;">
-                        <p><strong>Descripción:</strong> {{ registro.descripcion }}</p>
-                        <div style="display: flex; gap: 20px; background: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #eee;">
-                            <span><strong>Estado:</strong> {{ registro.estado }}</span>
-                            <span><strong>Avance:</strong> {{ registro.avance }}%</span>
-                        </div>
-                    </div>
-
-                    <div class="media-gallery" style="margin-top: 15px;">
-                        {% for foto in registro.fotos %}
-                        <div class="media-item" style="text-align: center;">
-                            <img src="data:image/png;base64,{{ foto.base64 }}" onclick="window.open(this.src)" title="{{ foto.desc }}">
-                            {% if foto.desc %}
-                                <p style="font-size: 10px; color: #888; margin-top: 5px;">{{ foto.desc }}</p>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div style="text-align: center; padding: 50px; color: #999;">
-                    <i class="fas fa-folder-open fa-3x"></i>
-                    <p>No hay reportes registrados para este proyecto.</p>
-                </div>
-            {% endif %}
-        </div>
-
-        <div class="bottom-menu" style="text-align: center; margin: 30px 0;">
-            <a href="{{ url_for('history') }}" class="bottom-button" style="background: #FFAF33; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
-                <i class="fas fa-arrow-left"></i> Volver a Proyectos
-            </a>
-        </div>
+    <!-- Logo -->
+    <div class="logo-container">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
     </div>
+
+    <!-- Encabezado del proyecto -->
+    <div style="text-align:center; margin: 20px 0;">
+        <h1 style="color:#333; margin:0;">{{ proyecto[0] }}</h1>
+        <p style="color:#666; margin:6px 0 0;">Cliente: {{ proyecto[1] }}</p>
+    </div>
+
+    <!-- Lista de informes -->
+    <div class="records-container" style="padding: 0 20px;">
+
+        {% if informes %}
+            {% for inf in informes %}
+            <div class="record-details">
+
+                <!-- Encabezado: número de informe + fecha -->
+                <div class="inf-header">
+                    <h3 class="inf-num">
+                        <i class="fas fa-file-alt"></i>
+                        Informe #{{ loop.revindex }}
+                    </h3>
+                    <span class="inf-fecha">
+                        <i class="far fa-calendar-alt"></i> {{ inf.fecha }}
+                    </span>
+                </div>
+
+                <!-- Barra de avance general -->
+                <div class="avance-row">
+                    <span class="avance-label"><i class="fas fa-percentage"></i> Avance</span>
+                    <div class="avance-bar-bg">
+                        <div class="avance-bar-fill" style="width: {{ inf.avance }}%;"></div>
+                    </div>
+                    <span class="avance-pct">{{ inf.avance }}%</span>
+                </div>
+
+                <!-- Fecha estimada de cierre + Materiales en fila -->
+                <div class="campos-row">
+                    {% if inf.fecha_cierre %}
+                    <div class="campo-bloque">
+                        <div class="campo-label"><i class="fas fa-calendar-check"></i> Cierre Estimado</div>
+                        <div class="campo-valor">{{ inf.fecha_cierre }}</div>
+                    </div>
+                    {% endif %}
+                    {% if inf.materiales %}
+                    <div class="campo-bloque">
+                        <div class="campo-label"><i class="fas fa-boxes"></i> Materiales</div>
+                        <div class="campo-valor">{{ inf.materiales }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Observaciones de seguridad -->
+                {% if inf.obs_seguridad %}
+                <div class="campo-bloque">
+                    <div class="campo-label">
+                        <span class="obs-chip seg"><i class="fas fa-hard-hat"></i> Seguridad</span>
+                    </div>
+                    <div class="campo-valor">{{ inf.obs_seguridad }}</div>
+                </div>
+                {% endif %}
+
+                <!-- Observaciones de calidad -->
+                {% if inf.obs_calidad %}
+                <div class="campo-bloque">
+                    <div class="campo-label">
+                        <span class="obs-chip cal"><i class="fas fa-check-circle"></i> Calidad</span>
+                    </div>
+                    <div class="campo-valor">{{ inf.obs_calidad }}</div>
+                </div>
+                {% endif %}
+
+                <!-- Notas generales con fotos -->
+                {% if inf.notas %}
+                <div class="notas-section">
+                    <div class="notas-section-title">
+                        <i class="fas fa-clipboard-list"></i> Notas Generales
+                    </div>
+                    {% for nota in inf.notas %}
+                    <div class="nota-item">
+                        <div class="nota-num">Nota {{ nota.numero }}</div>
+                        {% if nota.descripcion %}
+                        <div class="nota-desc">{{ nota.descripcion }}</div>
+                        {% endif %}
+                        {% if nota.fotos %}
+                        <div class="media-gallery">
+                            {% for foto in nota.fotos %}
+                            <div class="media-item">
+                                <img src="data:image/png;base64,{{ foto.base64 }}"
+                                     onclick="window.open(this.src)"
+                                     title="{{ foto.desc or '' }}">
+                                {% if foto.desc %}
+                                <p class="foto-desc">{{ foto.desc }}</p>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+            </div><!-- /.record-details -->
+            {% endfor %}
+
+        {% else %}
+            <div style="text-align:center; padding:50px; color:#999;">
+                <i class="fas fa-folder-open fa-3x"></i>
+                <p>No hay informes registrados para este proyecto.</p>
+            </div>
+        {% endif %}
+
+    </div><!-- /.records-container -->
+
+    <!-- Botón volver -->
+    <div style="text-align:center; margin: 30px 0;">
+        <a href="{{ url_for('history') }}"
+           style="background:#FFAF33; color:white; padding:12px 40px;
+                  border-radius:8px; text-decoration:none; font-weight:bold;">
+            <i class="fas fa-arrow-left"></i> Volver a Proyectos
+        </a>
+    </div>
+
+</div><!-- /.main-container -->
 </body>
 </html>

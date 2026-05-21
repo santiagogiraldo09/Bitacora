@@ -1094,62 +1094,99 @@ def inventario():
 def historialregistro(id_proyecto):
     if 'user_id' not in session:
         return redirect(url_for('principalscreen'))
-    
+ 
     conn = None
     try:
         conn = psycopg2.connect(**POSTGRES_CONFIG)
         cursor = conn.cursor()
-
-        # 1. Info del proyecto (Usar comillas dobles para la tabla)
-        cursor.execute('SELECT nombre_proyecto, cliente FROM proyectosTerranovus WHERE id_proyecto = %s', (id_proyecto,))
+ 
+        # 1. Info del proyecto
+        cursor.execute("""
+            SELECT nombre_proyecto, cliente
+            FROM proyectosTerranovus
+            WHERE id_proyecto = %s
+        """, (id_proyecto,))
         proyecto_info = cursor.fetchone()
-
+ 
         if not proyecto_info:
             return redirect(url_for('history'))
-
-        # 2. Consultar registros de la nueva tabla Terranovus
+ 
+        # 2. Todos los informes diarios del proyecto, más recientes primero
         cursor.execute("""
-            SELECT id_registro, fecha, actividad, descripcion_actividad, estado, porcentaje_avance 
-            FROM registrosbitacoraterranovus 
-            WHERE id_proyecto = %s ORDER BY fecha DESC, id_registro DESC
+            SELECT id_informe, fecha_registro, materiales,
+                   obs_seguridad, obs_calidad,
+                   fecha_estimada_cierre, porcentaje_avance
+            FROM informe_diario
+            WHERE id_proyecto = %s
+            ORDER BY fecha_registro DESC
         """, (id_proyecto,))
-        
-        registros_rows = cursor.fetchall()
-        reportes_completos = []
-
-        for r_row in registros_rows:
-            id_reg, fecha_dt, act, desc, est, avan = r_row
-            
-            # 3. Consultar fotos asociadas a este registro
-            cursor.execute('SELECT imagen_base64, description FROM fotos_registro_terranovus WHERE id_registro = %s', (id_reg,))
-            fotos_raw = cursor.fetchall()
-            
-            fotos = []
-            for f in fotos_raw:
-                img_str = f[0]
-                if img_str and "," in img_str:
-                    img_str = img_str.split(",")[1]
-                fotos.append({'base64': img_str, 'desc': f[1]})
-
-            reportes_completos.append({
-                'id_registro': id_reg,
-                'fecha': fecha_dt.strftime('%d/%m/%Y') if fecha_dt else "S/F",
-                'actividad': act,
-                'descripcion': desc,
-                'estado': est,
-                'avance': avan,
-                'fotos': fotos
+        informes_rows = cursor.fetchall()
+ 
+        informes_completos = []
+ 
+        for inf in informes_rows:
+            id_inf, fecha_dt, materiales, obs_seg, obs_cal, fecha_cierre, avance = inf
+ 
+            # 3. Notas generales de este informe
+            cursor.execute("""
+                SELECT id_nota, numero_nota, descripcion
+                FROM notas_informe_diario
+                WHERE id_informe = %s
+                ORDER BY numero_nota ASC
+            """, (id_inf,))
+            notas_rows = cursor.fetchall()
+ 
+            notas = []
+            for nota in notas_rows:
+                id_nota, num_nota, descripcion = nota
+ 
+                # 4. Fotos de esta nota
+                cursor.execute("""
+                    SELECT imagen_base64, description
+                    FROM fotos_nota_diario
+                    WHERE id_nota = %s
+                """, (id_nota,))
+                fotos_raw = cursor.fetchall()
+ 
+                fotos = []
+                for f in fotos_raw:
+                    img_str = f[0]
+                    # Quitar el prefijo data:image/...;base64, si existe
+                    if img_str and ',' in img_str:
+                        img_str = img_str.split(',')[1]
+                    fotos.append({'base64': img_str, 'desc': f[1]})
+ 
+                notas.append({
+                    'numero':      num_nota,
+                    'descripcion': descripcion,
+                    'fotos':       fotos
+                })
+ 
+            informes_completos.append({
+                'id_informe':   id_inf,
+                'fecha':        fecha_dt.strftime('%d/%m/%Y') if fecha_dt else 'S/F',
+                'materiales':   materiales,
+                'obs_seguridad': obs_seg,
+                'obs_calidad':  obs_cal,
+                'fecha_cierre': fecha_cierre.strftime('%d/%m/%Y') if fecha_cierre else None,
+                'avance':       float(avance) if avance is not None else 0,
+                'notas':        notas
             })
-
-        return render_template('historialRegistro.html', 
-                               proyecto=proyecto_info, 
-                               reportes=reportes_completos, 
-                               id_proyecto=id_proyecto)
+ 
+        return render_template(
+            'historialRegistro.html',
+            proyecto    = proyecto_info,
+            informes    = informes_completos,
+            id_proyecto = id_proyecto
+        )
+ 
     except Exception as e:
         print(f"Error en historialregistro: {e}")
+        traceback.print_exc()
         return redirect(url_for('history'))
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
 @app.route('/disciplinerecords')
 def disciplinerecords():
@@ -1715,57 +1752,169 @@ def exportar_proyectos_pdf():
         if conn: conn.close()
 
 
+#============================================================
+# CAMBIO EN app.py — Ruta /tablero-bi
+# ============================================================
+# Reemplaza COMPLETAMENTE la función tablero_bi() existente.
+# Busca en app.py: @app.route('/tablero-bi')
+# y reemplaza toda la función hasta el próximo @app.route
+# ============================================================
+ 
 @app.route('/tablero-bi')
 def tablero_bi():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    
+ 
     conn = None
     try:
         conn = psycopg2.connect(**POSTGRES_CONFIG)
         cursor = conn.cursor()
-
-        # 1. Estadísticas Generales de Proyectos
-        cursor.execute('SELECT COUNT(*) FROM proyectosTerranovus WHERE user_id = %s', (session['user_id'],))
+        uid = session['user_id']
+ 
+        # ── 1. Total proyectos ───────────────────────────────────
+        cursor.execute("""
+            SELECT COUNT(*) FROM proyectosTerranovus WHERE user_id = %s
+        """, (uid,))
         total_proyectos = cursor.fetchone()[0]
-
-        # 2. Avance promedio y total de registros
+ 
+        # ── 2. Total informes diarios y notas ───────────────────
         cursor.execute("""
-            SELECT 
-                COUNT(r.id_registro), 
-                AVG(r.porcentaje_avance) 
-            FROM registrosbitacoraterranovus r
-            JOIN proyectosTerranovus p ON r.id_proyecto = p.id_proyecto
+            SELECT COUNT(DISTINCT i.id_informe), COUNT(n.id_nota)
+            FROM informe_diario i
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+            LEFT JOIN notas_informe_diario n ON n.id_informe = i.id_informe
             WHERE p.user_id = %s
-        """, (session['user_id'],))
-        stats = cursor.fetchone()
-        total_registros = stats[0] or 0
-        promedio_avance = round(stats[1], 2) if stats[1] else 0
-
-        # 3. Conteo por Estados (para gráfico de torta)
+        """, (uid,))
+        row = cursor.fetchone()
+        total_informes = row[0] or 0
+        total_notas    = row[1] or 0
+ 
+        # ── 3. Avance promedio (último informe de cada proyecto) ─
         cursor.execute("""
-            SELECT estado, COUNT(*) 
-            FROM registrosbitacoraterranovus r
-            JOIN proyectosTerranovus p ON r.id_proyecto = p.id_proyecto
+            SELECT COALESCE(AVG(sub.ultimo_avance), 0)
+            FROM (
+                SELECT DISTINCT ON (i.id_proyecto)
+                    i.porcentaje_avance AS ultimo_avance
+                FROM informe_diario i
+                JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+                WHERE p.user_id = %s
+                ORDER BY i.id_proyecto, i.fecha_registro DESC
+            ) sub
+        """, (uid,))
+        promedio_avance = round(cursor.fetchone()[0], 1)
+ 
+        # ── 4. Últimos 8 informes (para tabla) ──────────────────
+        cursor.execute("""
+            SELECT
+                p.nombre_proyecto,
+                TO_CHAR(i.fecha_registro, 'DD/MM/YYYY') AS fecha,
+                COALESCE(i.porcentaje_avance, 0)         AS avance,
+                TO_CHAR(i.fecha_estimada_cierre, 'DD/MM/YYYY') AS fecha_cierre
+            FROM informe_diario i
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
             WHERE p.user_id = %s
-            GROUP BY estado
-        """, (session['user_id'],))
-        estados_raw = cursor.fetchall()
-        
-        # Convertimos a diccionario para fácil manejo en JS
-        datos_estados = {row[0]: row[1] for row in estados_raw}
-
-        return render_template('tableroBI.html', 
-                               total_p=total_proyectos,
-                               total_r=total_registros,
-                               promedio=promedio_avance,
-                               datos_estados=datos_estados)
-
+            ORDER BY i.fecha_registro DESC
+            LIMIT 8
+        """, (uid,))
+        informes_rows = cursor.fetchall()
+        informes_recientes = [
+            {
+                'proyecto':     r[0],
+                'fecha':        r[1],
+                'avance':       float(r[2]),
+                'fecha_cierre': r[3]
+            }
+            for r in informes_rows
+        ]
+ 
+        # ── 5. Últimas 6 notas generales ────────────────────────
+        cursor.execute("""
+            SELECT
+                p.nombre_proyecto,
+                TO_CHAR(i.fecha_registro, 'DD/MM/YYYY') AS fecha,
+                n.descripcion
+            FROM notas_informe_diario n
+            JOIN informe_diario i      ON n.id_informe  = i.id_informe
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+            WHERE p.user_id = %s
+              AND n.descripcion IS NOT NULL
+              AND TRIM(n.descripcion) <> ''
+            ORDER BY i.fecha_registro DESC, n.numero_nota ASC
+            LIMIT 6
+        """, (uid,))
+        notas_rows = cursor.fetchall()
+        notas_recientes = [
+            {
+                'proyecto':    r[0],
+                'fecha':       r[1],
+                'descripcion': r[2]
+            }
+            for r in notas_rows
+        ]
+ 
+        # ── 6. Observaciones seguridad y calidad (últimas 4) ────
+        cursor.execute("""
+            SELECT
+                p.nombre_proyecto,
+                TO_CHAR(i.fecha_registro, 'DD/MM/YYYY') AS fecha,
+                i.obs_seguridad,
+                i.obs_calidad
+            FROM informe_diario i
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+            WHERE p.user_id = %s
+              AND (
+                    (i.obs_seguridad IS NOT NULL AND TRIM(i.obs_seguridad) <> '')
+                 OR (i.obs_calidad   IS NOT NULL AND TRIM(i.obs_calidad)   <> '')
+              )
+            ORDER BY i.fecha_registro DESC
+            LIMIT 4
+        """, (uid,))
+        obs_rows = cursor.fetchall()
+        obs_recientes = [
+            {
+                'proyecto':  r[0],
+                'fecha':     r[1],
+                'seguridad': r[2],
+                'calidad':   r[3]
+            }
+            for r in obs_rows
+        ]
+ 
+        # ── 7. Avance más reciente por proyecto (para gráfico) ──
+        cursor.execute("""
+            SELECT DISTINCT ON (i.id_proyecto)
+                p.nombre_proyecto,
+                COALESCE(i.porcentaje_avance, 0) AS avance
+            FROM informe_diario i
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+            WHERE p.user_id = %s
+            ORDER BY i.id_proyecto, i.fecha_registro DESC
+        """, (uid,))
+        avance_rows = cursor.fetchall()
+        avance_por_proyecto = [
+            {'proyecto': r[0], 'avance': float(r[1])}
+            for r in avance_rows
+        ]
+ 
+        return render_template(
+            'tableroBI.html',
+            total_p              = total_proyectos,
+            total_informes       = total_informes,
+            total_notas          = total_notas,
+            promedio             = promedio_avance,
+            informes_recientes   = informes_recientes,
+            notas_recientes      = notas_recientes,
+            obs_recientes        = obs_recientes,
+            avance_por_proyecto  = avance_por_proyecto
+        )
+ 
     except Exception as e:
         print(f"Error en Tablero BI: {e}")
+        traceback.print_exc()
         return redirect(url_for('history'))
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
 
 @app.route('/exportar-proyectos-excel', methods=['POST'])
