@@ -407,72 +407,92 @@ function eliminarRegistro(btnEl, seccion) {
 //  VOZ — DICTADO POR CAMPO
 //  Compatible con el patrón de script.js existente
 // ═══════════════════════════════════════════════════════════
-let currentVozRecognition = null;
+// ── Variables de estado ────────────────
+let isVozRecording    = false;
+let vozMediaRecorder  = null;
+let vozAudioChunks    = [];
+let vozTargetInput    = null;
+let vozRecordBtn      = null;
+let vozStopBtn        = null;
 
+// ── Iniciar grabación ────────
 function iniciarVozCampo(btn) {
+    if (isVozRecording) return;
+
     const targetId = btn.getAttribute('data-target-input');
     const targetEl = document.getElementById(targetId);
+    const stopBtn  = btn.closest('.input-voz').querySelector('.stop-btn');
+
     if (!targetEl) return;
 
-    // Detener reconocimiento previo si existe
-    if (currentVozRecognition) {
-        currentVozRecognition.stop();
-        currentVozRecognition = null;
-    }
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            isVozRecording   = true;
+            vozAudioChunks   = [];
+            vozTargetInput   = targetEl;
+            vozRecordBtn     = btn;
+            vozStopBtn       = stopBtn;
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        alert('Tu navegador no soporta reconocimiento de voz. Usa Chrome.');
-        return;
-    }
+            // UI
+            btn.style.display     = 'none';
+            stopBtn.style.display = 'flex';
+            targetEl.style.outline = '2px solid #FFAF33';
+            targetEl.placeholder   = 'Escuchando...';
 
-    const recognition = new SpeechRecognition();
-    currentVozRecognition = recognition;
-    recognition.lang           = 'es-CO';
-    recognition.interimResults = false;
-    recognition.continuous     = false;
+            vozMediaRecorder = new MediaRecorder(stream);
+            vozMediaRecorder.start();
 
-    // UI: ocultar mic, mostrar stop
-    const stopBtn = btn.closest('.input-voz').querySelector('.stop-btn');
-    btn.style.display    = 'none';
-    stopBtn.style.display = 'flex';
-    targetEl.style.outline = '2px solid #FFAF33';
+            vozMediaRecorder.ondataavailable = e => vozAudioChunks.push(e.data);
 
-    recognition.onresult = (e) => {
-        const texto = e.results[0][0].transcript;
-        // Si el campo ya tiene texto, agregar con espacio
-        if (targetEl.value) {
-            targetEl.value += ' ' + texto;
-        } else {
-            targetEl.value = texto;
-        }
-    };
-
-    recognition.onend = () => {
-        btn.style.display     = 'flex';
-        stopBtn.style.display  = 'none';
-        targetEl.style.outline = '';
-        currentVozRecognition  = null;
-    };
-
-    recognition.onerror = (err) => {
-        console.error('Error voz:', err.error);
-        btn.style.display     = 'flex';
-        stopBtn.style.display  = 'none';
-        targetEl.style.outline = '';
-        currentVozRecognition  = null;
-    };
-
-    stopBtn.onclick = () => { recognition.stop(); };
-
-    recognition.start();
+            vozMediaRecorder.onstop = () => {
+                stream.getTracks().forEach(t => t.stop());
+                const audioBlob = new Blob(vozAudioChunks, { type: 'audio/webm' });
+                transcribirVoz(audioBlob);
+            };
+        })
+        .catch(() => alert('No se pudo acceder al micrófono.'));
 }
 
+// ── Detener grabación ────────────────────────────────────────
 function detenerVozCampo(btn) {
-    if (currentVozRecognition) {
-        currentVozRecognition.stop();
+    if (vozMediaRecorder && isVozRecording) {
+        vozMediaRecorder.stop();
     }
 }
+
+// ── Enviar a Azure y recibir texto ───────────────────────────
+function transcribirVoz(audioBlob) {
+    if (!vozTargetInput) return;
+    vozTargetInput.placeholder = 'Transcribiendo...';
+
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'respuesta.webm');
+
+    fetch('/transcribe-audio', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.text) {
+                // Acumula el texto igual que en script.js
+                vozTargetInput.value += (vozTargetInput.value ? ' ' : '') + data.text;
+            } else {
+                alert('No se pudo entender el audio.');
+            }
+        })
+        .catch(() => alert('Error en la transcripción.'))
+        .finally(() => {
+            if (vozRecordBtn) vozRecordBtn.style.display = 'flex';
+            if (vozStopBtn)  vozStopBtn.style.display   = 'none';
+            if (vozTargetInput) {
+                vozTargetInput.style.outline = '';
+                vozTargetInput.placeholder   = '';
+            }
+            isVozRecording = false;
+            vozTargetInput = null;
+            vozRecordBtn   = null;
+            vozStopBtn     = null;
+        });
+}
+
 
 // ═══════════════════════════════════════════════════════════
 //  AMPLIAR IMAGEN DEL TRAMO
