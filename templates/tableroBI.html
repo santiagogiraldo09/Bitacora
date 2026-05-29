@@ -212,20 +212,17 @@
         .volver-btn {
             flex-shrink: 0;          /* nunca se encoge */
             display: block;
-            /*width: 100%;*/
-            margin: 12px 40px 18px;
-            border-radius: 15px;
-            padding: 15px;
+            margin: 12px 50px 18px;  /* márgenes laterales → no ocupa todo el ancho */
+            padding: 12px 20px;
             background: #FFAF33;
             color: white;
             border: none;
+            border-radius: 15px;      /* bordes redondeados */
             font-size: 1em;
             font-weight: bold;
             cursor: pointer;
             text-align: center;
             text-decoration: none;
-            letter-spacing: 0.3px;
-            /*border-top: 1px solid rgba(0,0,0,0.08);*/
         }
         .volver-btn:hover { background: #e09a20; }
     </style>
@@ -354,12 +351,130 @@
 
     </div><!-- /.scroll-area -->
 
-    <!-- Botón fijo al fondo — fuera del scroll-area -->
-    <a href="{{ url_for('history') }}" class="volver-btn">
+    {% if not es_exportacion %}
+    <!-- Botón 1: Enviar por correo -->
+    <button type="button" class="volver-btn" id="btn-enviar-pdf"
+        
+        onclick="abrirModalCorreo()">
+        <i class="fas fa-envelope"></i> Exportar y enviar por correo
+    </button>
+
+    <!-- Botón 2: Volver -->
+    <a href="{{ url_for('history') }}" class="volver-btn"
+        
         <i class="fas fa-arrow-left"></i> Volver a Proyectos
     </a>
+    {% endif %}
 
 </div><!-- /.main-container -->
+
+{% if not es_exportacion %}
+<!-- ══════════════════════════════════════
+     MODAL: Ingresar correo destinatario
+══════════════════════════════════════ -->
+<div id="modal-correo" style="
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.55); z-index:9999;
+    justify-content:center; align-items:center;">
+
+    <div style="
+        background:white; border-radius:12px;
+        padding:28px 24px; width:90%; max-width:400px;
+        box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+
+        <h3 style="margin:0 0 6px; color:#333; font-size:1.1em;">
+            <i class="fas fa-envelope" style="color:#FFAF33;"></i>
+            Enviar Tablero BI por correo
+        </h3>
+        <p style="margin:0 0 18px; font-size:0.85em; color:#888;">
+            El tablero se generará en HTML interactivo y se enviará al destinatario indicado.
+        </p>
+
+        <label style="font-size:0.85em; font-weight:600; color:#555; display:block; margin-bottom:6px;">
+            Correo destinatario
+        </label>
+        <input type="email" id="input-correo-dest"
+            placeholder="ejemplo@correo.com"
+            style="width:100%; padding:11px 12px; border:1px solid #ddd;
+                   border-radius:7px; font-size:0.95em; box-sizing:border-box;
+                   outline:none; margin-bottom:18px;"
+            onkeydown="if(event.key==='Enter') enviarPDF()">
+
+        <!-- Spinner oculto -->
+        <div id="spinner-correo" style="display:none; text-align:center; margin-bottom:14px;">
+            <i class="fas fa-spinner fa-spin" style="color:#FFAF33; font-size:1.5em;"></i>
+            <span style="font-size:0.85em; color:#888; margin-left:8px;">Generando y enviando archivo...</span>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <button onclick="cerrarModalCorreo()" style="
+                flex:1; padding:11px; border:1px solid #ddd;
+                border-radius:7px; background:white; cursor:pointer;
+                font-size:0.9em; color:#555;">
+                Cancelar
+            </button>
+            <button onclick="enviarPDF()" id="btn-confirmar-envio" style="
+                flex:2; padding:11px; border:none;
+                border-radius:7px; background:#FFAF33;
+                color:white; cursor:pointer; font-size:0.9em; font-weight:bold;">
+                <i class="fas fa-paper-plane"></i> Enviar Tablero
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function abrirModalCorreo() {
+        document.getElementById('modal-correo').style.display = 'flex';
+        setTimeout(() => document.getElementById('input-correo-dest').focus(), 100);
+    }
+
+    function cerrarModalCorreo() {
+        document.getElementById('modal-correo').style.display = 'none';
+        document.getElementById('input-correo-dest').value = '';
+        document.getElementById('spinner-correo').style.display = 'none';
+        document.getElementById('btn-confirmar-envio').disabled = false;
+    }
+
+    async function enviarPDF() {
+        const correo = document.getElementById('input-correo-dest').value.trim();
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!re.test(correo)) {
+            alert('Por favor ingresa un correo válido.');
+            return;
+        }
+
+        // Mostrar spinner y deshabilitar botón
+        document.getElementById('spinner-correo').style.display = 'block';
+        document.getElementById('btn-confirmar-envio').disabled = true;
+
+        try {
+            const res = await fetch('/exportar-tablero-pdf-correo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ correo_destino: correo })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                cerrarModalCorreo();
+                alert('✅ ' + (data.message || 'Tablero enviado correctamente.'));
+            } else {
+                throw new Error(data.error || 'Error al enviar el correo.');
+            }
+        } catch (err) {
+            alert('❌ ' + err.message);
+            document.getElementById('spinner-correo').style.display = 'none';
+            document.getElementById('btn-confirmar-envio').disabled = false;
+        }
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('modal-correo').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalCorreo();
+    });
+</script>
+{% endif %}
 
 <script>
     {% if avance_por_proyecto %}
@@ -385,7 +500,10 @@
                 ),
                 borderRadius: 5,
                 borderSkipped: false,
-                barThickness: 28
+                //barThickness: 28
+                maxBarThickness: 20,      // Define un grosor máximo para que no se vean toscas
+                barPercentage: 0.7,       // La barra ocupará el 70% del espacio disponible (haciéndola más delgada)
+                categoryPercentage: 0.8
             }]
         },
         options: {

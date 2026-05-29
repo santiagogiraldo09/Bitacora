@@ -37,6 +37,7 @@ from fpdf import FPDF
 import io
 import base64
 from tempfile import NamedTemporaryFile
+from flask_mail import Mail, Message
 
 # Configurar zona horaria
 tijuana_tz = pytz.timezone('America/Tijuana')
@@ -77,6 +78,13 @@ SHAREPOINT_PASSWORD = "Latumbanuncamuere3"
 app = Flask(__name__,template_folder='templates')
 app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
+app.config['MAIL_SERVER']         = 'smtp.gmail.com'
+app.config['MAIL_PORT']           = 587
+app.config['MAIL_USE_TLS']        = True
+app.config['MAIL_USERNAME']       = 'muneragacias@gmail.com'
+app.config['MAIL_PASSWORD']       = 'rxghrdeqoupdkaex'
+app.config['MAIL_DEFAULT_SENDER'] = 'muneragacias@gmail.com'
+mail = Mail(app)
 CORS(app)
 
 projects = []
@@ -656,8 +664,10 @@ def registro():
     
     return render_template('registro.html')
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'GET':
+        return redirect(url_for('principalscreen'))
     email = request.form.get('email')
     password = request.form.get('password')
     
@@ -1412,6 +1422,153 @@ def guardar_registro():
     finally:
         if conn: conn.close()
 
+# ============================================================
+# CAMBIO EN app.py — Ruta /exportar-tablero-pdf-correo  v2
+# ============================================================
+# Reemplaza la versión anterior completa de esta función.
+# Los imports y EMAIL_CONFIG ya los tienes, no cambian.
+# ============================================================
+
+@app.route('/exportar-tablero-pdf-correo', methods=['POST'])
+def exportar_tablero_pdf_correo():
+    if 'user_id' not in session:
+        return jsonify({"error": "Sesion no valida"}), 401
+    
+    data = request.get_json()
+    correo_destino = (data or {}).get('correo_destino', '').strip()
+    if not correo_destino or '@' not in correo_destino:
+        return jsonify({"error": "Correo destinatario invalido"}), 400
+    conn = None
+    try:
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+        uid = session['user_id']
+        # ── Mismas queries que tablero_bi() ─────────────────────
+        cursor.execute(
+            "SELECT COUNT(*) FROM proyectosTerranovus WHERE user_id = %s", (uid,))
+        total_p = cursor.fetchone()[0]
+        cursor.execute("""
+            SELECT COUNT(DISTINCT i.id_informe), COUNT(n.id_nota)
+            FROM informe_diario i
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+            LEFT JOIN notas_informe_diario n ON n.id_informe = i.id_informe
+            WHERE p.user_id = %s
+        """, (uid,))
+        row = cursor.fetchone()
+        total_informes = row[0] or 0
+        total_notas    = row[1] or 0
+        cursor.execute("""
+            SELECT COALESCE(AVG(sub.ultimo_avance), 0)
+            FROM (
+                SELECT DISTINCT ON (i.id_proyecto) i.porcentaje_avance AS ultimo_avance
+                FROM informe_diario i
+                JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+                WHERE p.user_id = %s
+                ORDER BY i.id_proyecto, i.fecha_registro DESC
+            ) sub
+        """, (uid,))
+        promedio = round(cursor.fetchone()[0], 1)
+        cursor.execute("""
+            SELECT p.nombre_proyecto,
+                   TO_CHAR(i.fecha_registro, 'DD/MM/YYYY'),
+                   COALESCE(i.porcentaje_avance, 0),
+                   TO_CHAR(i.fecha_estimada_cierre, 'DD/MM/YYYY')
+            FROM informe_diario i
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+            WHERE p.user_id = %s
+            ORDER BY i.fecha_registro DESC LIMIT 8
+        """, (uid,))
+        informes_recientes = [
+            {'proyecto': r[0], 'fecha': r[1],
+             'avance': float(r[2]), 'fecha_cierre': r[3]}
+            for r in cursor.fetchall()
+        ]
+        cursor.execute("""
+            SELECT p.nombre_proyecto,
+                   TO_CHAR(i.fecha_registro, 'DD/MM/YYYY'),
+                   n.descripcion
+            FROM notas_informe_diario n
+            JOIN informe_diario i      ON n.id_informe  = i.id_informe
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+            WHERE p.user_id = %s
+              AND n.descripcion IS NOT NULL AND TRIM(n.descripcion) <> ''
+            ORDER BY i.fecha_registro DESC, n.numero_nota ASC LIMIT 6
+        """, (uid,))
+        notas_recientes = [
+            {'proyecto': r[0], 'fecha': r[1], 'descripcion': r[2]}
+            for r in cursor.fetchall()
+        ]
+        cursor.execute("""
+            SELECT p.nombre_proyecto,
+                   TO_CHAR(i.fecha_registro, 'DD/MM/YYYY'),
+                   i.obs_seguridad, i.obs_calidad
+            FROM informe_diario i
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+            WHERE p.user_id = %s
+              AND ((i.obs_seguridad IS NOT NULL AND TRIM(i.obs_seguridad) <> '')
+                OR (i.obs_calidad   IS NOT NULL AND TRIM(i.obs_calidad)   <> ''))
+            ORDER BY i.fecha_registro DESC LIMIT 4
+        """, (uid,))
+        obs_recientes = [
+            {'proyecto': r[0], 'fecha': r[1],
+             'seguridad': r[2], 'calidad': r[3]}
+            for r in cursor.fetchall()
+        ]
+        cursor.execute("""
+            SELECT DISTINCT ON (i.id_proyecto)
+                p.nombre_proyecto,
+                COALESCE(i.porcentaje_avance, 0)
+            FROM informe_diario i
+            JOIN proyectosTerranovus p ON i.id_proyecto = p.id_proyecto
+            WHERE p.user_id = %s
+            ORDER BY i.id_proyecto, i.fecha_registro DESC
+        """, (uid,))
+        avance_por_proyecto = [
+            {'proyecto': r[0], 'avance': float(r[1])}
+            for r in cursor.fetchall()
+        ]
+        # ── Renderizar el template como HTML con la bandera es_exportacion ──
+        html_string = render_template(
+            'tableroBI.html',
+            total_p             = total_p,
+            total_informes      = total_informes,
+            total_notas         = total_notas,
+            promedio            = promedio,
+            informes_recientes  = informes_recientes,
+            notas_recientes     = notas_recientes,
+            obs_recientes       = obs_recientes,
+            avance_por_proyecto = avance_por_proyecto,
+            es_exportacion      = True
+        )
+        # ── Enviar el HTML como archivo adjunto ──────────────────
+        msg = Message(
+            subject    = f"Tablero de Gestion BI - {datetime.now().strftime('%d/%m/%Y')}",
+            recipients = [correo_destino],
+            body       = "Cordial saludo. Adjunto encontrarás el Tablero de Gestión BI generado en formato HTML interactivo. Por favor descárgalo y ábrelo en tu navegador web de preferencia."
+        )
+        
+        # Adjuntar el archivo renderizado
+        msg.attach(
+            filename="Tablero_Gestion_BI.html",
+            content_type="text/html",
+            data=html_string.encode('utf-8')
+        )
+
+        mail.send(msg)
+        print(f"Tablero BI enviado a {correo_destino}")
+        return jsonify({
+            "status":  "success",
+            "message": f"Tablero enviado correctamente a {correo_destino}"
+        }), 200
+    except Exception as e:
+        print(f"Error exportar_tablero_pdf_correo: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/eliminar-proyecto', methods=['POST'])
 def eliminar_proyecto():
     if 'user_id' not in session:
@@ -1597,159 +1754,247 @@ def exportar_registros_excel():
         if conn:
             conn.close()
 
+
+# ============================================================
+# CAMBIO EN app.py — Ruta /exportar-proyectos-pdf
+# ============================================================
+# Reemplaza COMPLETAMENTE la función exportar_proyectos_pdf().
+# Busca: @app.route('/exportar-proyectos-pdf', methods=['POST'])
+# y reemplaza toda la función hasta el próximo @app.route
+# ============================================================
 @app.route('/exportar-proyectos-pdf', methods=['POST'])
 def exportar_proyectos_pdf():
     project_ids = request.form.getlist('project_ids')
     if not project_ids:
         return "No se seleccionaron proyectos", 400
-
+ 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
-
+ 
+    # Helper: texto seguro para FPDF (latin-1)
+    def txt(valor, default='—'):
+        if not valor:
+            return default
+        return str(valor).encode('latin-1', 'replace').decode('latin-1')
+ 
+    # Helper: insertar fila de fotos (3 por fila, 60mm c/u)
+    def insertar_fotos(fotos_raw):
+        if not fotos_raw:
+            return
+        pdf.ln(2)
+        pdf.set_font("Arial", 'B', 9)
+        pdf.cell(0, 7, "EVIDENCIA FOTOGRÁFICA:", ln=True)
+ 
+        img_w = 60
+        current_x = 10
+        y_fila = pdf.get_y()
+ 
+        for i, (foto_data, foto_desc) in enumerate(fotos_raw):
+            if pdf.get_y() > 220 or (i > 0 and i % 3 == 0):
+                pdf.set_y(y_fila + 50)
+                current_x = 10
+                y_fila = pdf.get_y()
+                if pdf.get_y() > 220:
+                    pdf.add_page()
+                    y_fila = pdf.get_y()
+ 
+            try:
+                encoded = foto_data.split(',', 1)[1] if ',' in foto_data else foto_data
+                img_bytes = base64.b64decode(encoded)
+                with NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                    tmp.write(img_bytes)
+                    tmp_path = tmp.name
+ 
+                pdf.image(tmp_path, x=current_x, y=y_fila, w=img_w, h=40)
+                pdf.set_xy(current_x, y_fila + 41)
+                pdf.set_font("Arial", 'I', 7)
+                pie = txt(foto_desc, '')[:40]
+                pdf.cell(img_w, 4, pie, align='C')
+                current_x += img_w + 5
+                pdf.set_y(y_fila)
+ 
+            except Exception as e:
+                print(f"Error procesando imagen: {e}")
+ 
+        pdf.set_y(y_fila + 50)
+        pdf.ln(2)
+ 
     try:
         conn = psycopg2.connect(**POSTGRES_CONFIG)
         cursor = conn.cursor()
-
+ 
         for pid in project_ids:
-            # 1. Info del proyecto (Tabla: proyectosTerranovus)
+ 
+            # ── 1. Info del proyecto ─────────────────────────────
             cursor.execute("""
-                SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion, fecha_inicio 
-                FROM proyectosTerranovus WHERE id_proyecto = %s
+                SELECT nombre_proyecto, cliente, contratista,
+                       orden_de_trabajo, ubicacion, fecha_inicio
+                FROM proyectosTerranovus
+                WHERE id_proyecto = %s
             """, (pid,))
             proyecto = cursor.fetchone()
-            if not proyecto: continue
-
+            if not proyecto:
+                continue
+ 
             nombre, cliente, contratista, ot, ubicacion, f_inicio = proyecto
+ 
             pdf.add_page()
-            
-            # --- ENCABEZADO TÉCNICO (190mm Total) ---
-            y_inicial = pdf.get_y()
-            
-            # Celda Logo (40mm)
-            pdf.rect(10, y_inicial, 40, 20)
+ 
+            # ── Encabezado del proyecto ──────────────────────────
+            y0 = pdf.get_y()
+            pdf.rect(10, y0, 40, 20)
             logo_path = os.path.join('static', 'logo.png')
             if os.path.exists(logo_path):
-                pdf.image(logo_path, x=15, y=y_inicial + 2, w=30)
-            
-            # Celda Título (150mm)
-            pdf.set_xy(50, y_inicial)
-            pdf.set_font("Arial", 'B', 14)
-            pdf.cell(150, 20, "REPORTE TÉCNICO DE ACTIVIDADES", border=1, ln=True, align='C')
-
-            # Filas de Información (Ancho total 190mm)
+                pdf.image(logo_path, x=15, y=y0 + 2, w=30)
+ 
+            pdf.set_xy(50, y0)
+            pdf.set_font("Arial", 'B', 13)
+            pdf.cell(150, 20, "INFORME DIARIO DE TRABAJO", border=1, ln=True, align='C')
+ 
             pdf.set_font("Arial", 'B', 9)
             pdf.cell(30, 8, "PROYECTO:", border=1)
             pdf.set_font("Arial", '', 9)
-            pdf.cell(65, 8, f"{nombre or ''}", border=1)
+            pdf.cell(65, 8, txt(nombre), border=1)
             pdf.set_font("Arial", 'B', 9)
             pdf.cell(40, 8, "CLIENTE:", border=1)
             pdf.set_font("Arial", '', 9)
-            pdf.cell(55, 8, f"{cliente or ''}", border=1, ln=True)
-
+            pdf.cell(55, 8, txt(cliente), border=1, ln=True)
+ 
             pdf.set_font("Arial", 'B', 9)
-            pdf.cell(30, 8, "UBICACIÓN:", border=1)
+            pdf.cell(30, 8, "UBICACION:", border=1)
             pdf.set_font("Arial", '', 9)
-            pdf.cell(65, 8, f"{ubicacion or ''}", border=1)
+            pdf.cell(65, 8, txt(ubicacion), border=1)
             pdf.set_font("Arial", 'B', 9)
             pdf.cell(40, 8, "ORDEN DE TRABAJO:", border=1)
             pdf.set_font("Arial", '', 9)
-            pdf.cell(55, 8, f"{ot or ''}", border=1, ln=True)
-            
-            pdf.ln(10)
-
-            # --- REGISTROS DE ACTIVIDAD ---
+            pdf.cell(55, 8, txt(ot), border=1, ln=True)
+ 
+            pdf.ln(8)
+ 
+            # ── 2. Informes diarios del proyecto ─────────────────
             cursor.execute("""
-                SELECT id_registro, actividad, descripcion_actividad, estado, porcentaje_avance, fecha
-                FROM registrosbitacoraterranovus 
-                WHERE id_proyecto = %s ORDER BY fecha DESC
+                SELECT id_informe, fecha_registro, materiales,
+                       obs_seguridad, obs_calidad,
+                       fecha_estimada_cierre, porcentaje_avance
+                FROM informe_diario
+                WHERE id_proyecto = %s
+                ORDER BY fecha_registro DESC
             """, (pid,))
-            registros = cursor.fetchall()
-
-            for reg in registros:
-                id_reg, actividad, desc, estado, avance, fecha_reg = reg
-                
-                # Encabezado Actividad
-                pdf.set_fill_color(255, 240, 220)
-                pdf.set_font("Arial", 'B', 11)
-                pdf.cell(190, 8, f"FECHA: {fecha_reg} - ACTIVIDAD: {actividad or 'Sin actividad'}", ln=True, fill=True, border='T')
-                
-                # Descripción
-                pdf.set_font("Arial", '', 10)
-                pdf.multi_cell(190, 6, f"Descripción: {desc or 'Sin descripción'}", border='LR')
-
-                # FIX: Forzar X al margen izquierdo después del multi_cell
-                pdf.set_x(10)
-
-                # ESTADO Y AVANCE (95mm + 95mm = 190mm)
+            informes = cursor.fetchall()
+ 
+            if not informes:
+                pdf.set_font("Arial", 'I', 10)
+                pdf.cell(0, 8, "Sin informes registrados para este proyecto.", ln=True)
+                continue
+ 
+            for idx, inf in enumerate(informes, 1):
+                id_inf, fecha_dt, materiales, obs_seg, obs_cal, fecha_cierre, avance = inf
+ 
+                fecha_str  = fecha_dt.strftime('%d/%m/%Y') if fecha_dt else 'S/F'
+                cierre_str = fecha_cierre.strftime('%d/%m/%Y') if fecha_cierre else '—'
+                avance_val = float(avance) if avance is not None else 0
+ 
+                # ── Encabezado del informe ───────────────────────
+                pdf.set_fill_color(255, 240, 210)
                 pdf.set_font("Arial", 'B', 10)
-                pdf.set_fill_color(245, 245, 245)
-                pdf.cell(95, 8, f" ESTADO: {estado or 'N/A'}", border=1, fill=True)
-                pdf.cell(95, 8, f" AVANCE: {avance or 0}%", border=1, fill=True, ln=True)
-                
-                # --- SECCIÓN DE EVIDENCIA FOTOGRÁFICA ---
-                cursor.execute("SELECT imagen_base64, description FROM fotos_registro_terranovus WHERE id_registro = %s", (id_reg,))
-                fotos = cursor.fetchall()
-                
-                if fotos:
-                    pdf.ln(2)
-                    pdf.set_font("Arial", 'B', 10)
-                    pdf.cell(0, 8, "EVIDENCIA:", ln=True)
-                    
-                    img_w = 60
-                    current_x = 10
-                    
-                    for i, (foto_data, foto_desc) in enumerate(fotos):
-                        # Salto de página preventivo
-                        if pdf.get_y() > 220:
-                            pdf.add_page()
-                            pdf.ln(5)
-                            current_x = 10
-
-                        # Fila de 3 fotos
-                        if i > 0 and i % 3 == 0:
-                            pdf.set_y(pdf.get_y() + 50)
-                            current_x = 10
-
-                        try:
-                            header, encoded = foto_data.split(",", 1) if "," in foto_data else ("", foto_data)
-                            img_bytes = base64.b64decode(encoded)
-                            
-                            with NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-                                tmp.write(img_bytes)
-                                tmp_path = tmp.name
-                            
-                            # Imagen
-                            pdf.image(tmp_path, x=current_x, y=pdf.get_y(), w=img_w, h=40)
-                            
-                            # Descripción (Pie de foto opcional)
-                            pdf.set_xy(current_x, pdf.get_y() + 41)
-                            pdf.set_font("Arial", 'I', 7)
-                            desc_txt = (foto_desc[:40]) if foto_desc else ""
-                            pdf.cell(img_w, 4, desc_txt, align='C')
-                            
-                            current_x += img_w + 5
-                            pdf.set_y(pdf.get_y() - 41)
-
-                        except Exception as e:
-                            print(f"Error procesando imagen: {e}")
-                    
-                    pdf.set_y(pdf.get_y() + 55)
-                else:
-                    pdf.ln(5)
-
+                pdf.cell(
+                    190, 8,
+                    f"  INFORME #{idx}   |   FECHA: {fecha_str}   |   AVANCE: {avance_val}%",
+                    ln=True, fill=True, border='LTR'
+                )
+ 
+                # ── Cierre estimado + Avance ─────────────────────
+                pdf.set_fill_color(250, 250, 250)
+                pdf.set_font("Arial", 'B', 9)
+                pdf.cell(95, 7, f"  CIERRE ESTIMADO: {cierre_str}", border=1, fill=True)
+                pdf.cell(95, 7, f"  AVANCE GENERAL: {avance_val}%", border=1, fill=True, ln=True)
+ 
+                # ── Materiales ───────────────────────────────────
+                if materiales and materiales.strip():
+                    pdf.set_font("Arial", 'B', 9)
+                    pdf.cell(30, 7, "MATERIALES:", border='L')
+                    pdf.set_font("Arial", '', 9)
+                    pdf.set_x(40)
+                    pdf.multi_cell(160, 7, txt(materiales), border='R')
+                    pdf.set_x(10)
+ 
+                # ── Observaciones seguridad ──────────────────────
+                if obs_seg and obs_seg.strip():
+                    pdf.set_font("Arial", 'B', 9)
+                    pdf.set_fill_color(240, 240, 240)
+                    pdf.cell(190, 6, "  SEGURIDAD DEL SITIO:", border='LR', fill=True, ln=True)
+                    pdf.set_font("Arial", '', 9)
+                    pdf.set_x(10)
+                    pdf.multi_cell(190, 6, txt(obs_seg), border='LR')
+                    pdf.set_x(10)
+ 
+                # ── Observaciones calidad ────────────────────────
+                if obs_cal and obs_cal.strip():
+                    pdf.set_font("Arial", 'B', 9)
+                    pdf.set_fill_color(240, 240, 240)
+                    pdf.cell(190, 6, "  CONTROL DE CALIDAD:", border='LR', fill=True, ln=True)
+                    pdf.set_font("Arial", '', 9)
+                    pdf.set_x(10)
+                    pdf.multi_cell(190, 6, txt(obs_cal), border='LR')
+                    pdf.set_x(10)
+ 
+                # ── 3. Notas generales ───────────────────────────
+                cursor.execute("""
+                    SELECT id_nota, numero_nota, descripcion
+                    FROM notas_informe_diario
+                    WHERE id_informe = %s
+                    ORDER BY numero_nota ASC
+                """, (id_inf,))
+                notas = cursor.fetchall()
+ 
+                if notas:
+                    pdf.set_fill_color(240, 240, 240)
+                    pdf.set_font("Arial", 'B', 9)
+                    pdf.cell(190, 6, "  NOTAS GENERALES:", border='LR', fill=True, ln=True)
+ 
+                    for id_nota, num_nota, descripcion in notas:
+                        # Título de la nota
+                        pdf.set_font("Arial", 'B', 9)
+                        pdf.set_x(10)
+                        pdf.cell(190, 6, f"  Nota {num_nota}:", border='LR', ln=True)
+ 
+                        # Descripción
+                        if descripcion and descripcion.strip():
+                            pdf.set_font("Arial", '', 9)
+                            pdf.set_x(14)
+                            pdf.multi_cell(186, 6, txt(descripcion), border='R')
+                            pdf.set_x(10)
+ 
+                        # ── 4. Fotos de la nota ──────────────────
+                        cursor.execute("""
+                            SELECT imagen_base64, description
+                            FROM fotos_nota_diario
+                            WHERE id_nota = %s
+                        """, (id_nota,))
+                        fotos_raw = cursor.fetchall()
+                        insertar_fotos(fotos_raw)
+ 
+                # Línea de cierre del informe
+                pdf.set_x(10)
+                pdf.cell(190, 2, "", border='LBR', ln=True)
+                pdf.ln(6)
+ 
+        # ── Generar y devolver el PDF ────────────────────────────
         response_pdf = pdf.output(dest='S')
         return send_file(
             io.BytesIO(response_pdf),
             mimetype='application/pdf',
             as_attachment=True,
-            download_name=f"Reporte_Terranovus_{datetime.now().strftime('%Y%m%d')}.pdf"
+            download_name=f"Informes_Diarios_{datetime.now().strftime('%Y%m%d')}.pdf"
         )
-
+ 
     except Exception as e:
         print(f"Error PDF: {e}")
+        traceback.print_exc()
         return f"Error: {str(e)}", 500
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
 
 #============================================================
