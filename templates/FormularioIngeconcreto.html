@@ -145,9 +145,37 @@
             </button>
         </div>
 
+        <!-- ── Imagen del tramo de losa (planta) ───────────── -->
+        {% if tramo %}
+        <div class="seccion-inspeccion" id="sec-tramo-imagen" style="margin-top:24px;">
+            <div class="seccion-header">
+                <span>
+                    <i class="fas fa-map seccion-icon"></i>
+                    &nbsp;Tramo de Losa — Planta
+                </span>
+                <span style="font-size:0.8rem; font-weight:400; opacity:0.85;">
+                    {{ tramo.nombre }}
+                </span>
+            </div>
+            <div style="padding:14px; text-align:center; background:#fafafa;">
+                <img src="{{ tramo.imagen_url }}"
+                     alt="Plano del tramo {{ tramo.nombre }}"
+                     id="img-tramo-planta"
+                     style="max-width:100%; border-radius:6px; border:1px solid #ddd;
+                            cursor:zoom-in;"
+                     onclick="ampliarImagen(this.src, this.alt)">
+                <p style="font-size:0.75rem; color:#999; margin-top:8px;">
+                    <i class="fas fa-search-plus"></i>
+                    Toca la imagen para ampliarla
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- ── Botones de acción ─────────────────────────── -->
         <div class="form-actions">
-            <button class="btn-regresar" onclick="history.back()">
+            <button class="btn-regresar"
+                    onclick="window.location.href='/seleccionar-tramo?project_id=' + new URLSearchParams(window.location.search).get('project_id')">
                 <i class="fas fa-arrow-left"></i> Regresar
             </button>
             <button class="btn-guardar" onclick="guardarFormulario()">
@@ -156,6 +184,15 @@
         </div>
 
     </div><!-- /.form-body -->
+
+    <!-- Modal imagen ampliada (tramo) -->
+    <div id="modal-tramo" style="display:none; position:fixed; inset:0;
+         background:rgba(0,0,0,0.8); z-index:9999; justify-content:center;
+         align-items:center; padding:16px;"
+         onclick="this.style.display='none'">
+        <img id="modal-tramo-img" src="" alt=""
+             style="max-width:100%; max-height:88vh; border-radius:8px; object-fit:contain;">
+    </div>
 
 </div><!-- /#app -->
 
@@ -438,15 +475,27 @@ function detenerVozCampo(btn) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  AMPLIAR IMAGEN DEL TRAMO
+// ═══════════════════════════════════════════════════════════
+function ampliarImagen(src, alt) {
+    const modal = document.getElementById('modal-tramo');
+    document.getElementById('modal-tramo-img').src = src;
+    document.getElementById('modal-tramo-img').alt = alt;
+    modal.style.display = 'flex';
+}
+
+// ═══════════════════════════════════════════════════════════
 //  RECOPILAR DATOS DEL FORMULARIO
 // ═══════════════════════════════════════════════════════════
 function recopilarFormulario() {
     const urlParams  = new URLSearchParams(window.location.search);
     const projectId  = urlParams.get('project_id');
+    const tramoId    = urlParams.get('tramo_id');
     const tipoRadio  = document.querySelector('input[name="tipo_revision"]:checked');
 
     const encabezado = {
         project_id:  projectId,
+        tramo_id:    tramoId || null,
         tipo:        tipoRadio ? tipoRadio.value : null,
         proyecto:    document.getElementById('info-proyecto').value.trim(),
         contratista: document.getElementById('info-contratista').value.trim(),

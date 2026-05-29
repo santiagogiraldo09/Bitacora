@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleccionar Tramo</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='FormularioIngeconcreto.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .page-intro {
+            padding: 20px 18px 4px;
+            text-align: center;
+        }
+
+        .page-intro h2 {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .page-intro p {
+            font-size: 0.85rem;
+            color: #777;
+            margin-top: 6px;
+        }
+
+        .proyecto-badge {
+            background: var(--amarillo-claro);
+            border-left: 4px solid var(--amarillo);
+            padding: 10px 18px;
+            margin: 12px 18px 0;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #555;
+        }
+
+        .proyecto-badge strong { color: var(--naranja); }
+
+        /* ── Grid de tarjetas de tramo ── */
+        .tramos-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            padding: 18px;
+        }
+
+        .tramo-select-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+            background: var(--blanco);
+        }
+
+        .tramo-select-card:hover {
+            border-color: var(--amarillo);
+            box-shadow: 0 4px 14px rgba(255,175,51,0.25);
+            transform: translateY(-2px);
+        }
+
+        .tramo-select-card.seleccionado {
+            border-color: var(--naranja);
+            box-shadow: 0 4px 14px rgba(255,102,0,0.3);
+        }
+
+        .tramo-img-wrapper {
+            width: 100%;
+            height: 130px;
+            overflow: hidden;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tramo-img-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .tramo-select-card:hover .tramo-img-wrapper img {
+            transform: scale(1.04);
+        }
+
+        .tramo-card-footer {
+            padding: 10px 12px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .tramo-card-nombre {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tramo-card-meta {
+            font-size: 0.72rem;
+            color: #999;
+            margin-top: 2px;
+        }
+
+        .tramo-card-btn {
+            margin-top: 8px;
+            width: 100%;
+            padding: 7px;
+            background: var(--naranja);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            font-family: 'Barlow', sans-serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: background 0.2s;
+        }
+
+        .tramo-card-btn:hover { background: var(--naranja-hover); }
+
+        /* ── Empty state ── */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px 20px;
+            color: #aaa;
+            font-size: 0.88rem;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 12px;
+            color: #ddd;
+        }
+
+        .empty-state a {
+            color: var(--naranja);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* ── Botón regresar ── */
+        .acciones-footer {
+            padding: 4px 18px 24px;
+        }
+
+        .btn-regresar {
+            width: 100%;
+            padding: 11px;
+            background: #f0f0f0;
+            color: #555;
+            border: none;
+            border-radius: 7px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            font-family: 'Barlow', sans-serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+
+        .btn-regresar:hover { background: #e0e0e0; }
+
+        @media (max-width: 480px) {
+            .tramos-grid { grid-template-columns: 1fr; }
+            .tramo-img-wrapper { height: 180px; }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+
+    <!-- Header -->
+    <div class="form-header">
+        <div class="header-left">
+            <div class="header-title">Seleccionar Tramo</div>
+            <div class="header-subtitle">Revisión de Losas</div>
+        </div>
+        <div class="header-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo IAC">
+        </div>
+    </div>
+
+    <div class="page-intro">
+        <h2>¿Sobre qué tramo vas a realizar la revisión?</h2>
+        <p>Selecciona el plano de planta correspondiente</p>
+    </div>
+
+    <div class="proyecto-badge">
+        <i class="fas fa-building"></i>
+        Proyecto: <strong>{{ project.nombre if project else 'N/A' }}</strong>
+    </div>
+
+    <!-- ══ Grid de tramos ══ -->
+    <div class="tramos-grid">
+        {% if tramos %}
+            {% for t in tramos %}
+            <div class="tramo-select-card" id="card-{{ t.id_tramo }}">
+                <div class="tramo-img-wrapper">
+                    <img src="{{ t.imagen_url }}" alt="{{ t.nombre }}">
+                </div>
+                <div class="tramo-card-footer">
+                    <div class="tramo-card-nombre">{{ t.nombre }}</div>
+                    <div class="tramo-card-meta">
+                        <i class="fas fa-calendar-alt"></i>
+                        {{ t.created_at.strftime('%d/%m/%Y') if t.created_at else '' }}
+                    </div>
+                    <button class="tramo-card-btn"
+                            onclick="seleccionarTramo({{ t.id_tramo }}, '{{ t.nombre | e }}')">
+                        <i class="fas fa-arrow-right"></i> Iniciar revisión
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-images"></i>
+                No hay tramos cargados para este proyecto.<br><br>
+                {% if rol == 'admin' %}
+                    <a href="/admin-tramos?project_id={{ project_id }}">
+                        <i class="fas fa-plus-circle"></i> Cargar tramos ahora
+                    </a>
+                {% else %}
+                    Contacta al administrador del proyecto para que cargue los tramos.
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Botón regresar -->
+    <div class="acciones-footer">
+        <button class="btn-regresar"
+                onclick="window.location.href='/paginaprincipal?project_id={{ project_id }}&project={{ project.nombre if project else '' }}'">
+            <i class="fas fa-arrow-left"></i> Regresar al proyecto
+        </button>
+    </div>
+
+</div><!-- /#app -->
+
+<script>
+const PROJECT_ID = "{{ project_id }}";
+const PROJECT_NAME = "{{ project.nombre if project else '' }}";
+
+function seleccionarTramo(idTramo, nombreTramo) {
+    // Feedback visual
+    document.querySelectorAll('.tramo-select-card').forEach(c =>
+        c.classList.remove('seleccionado'));
+    document.getElementById(`card-${idTramo}`)?.classList.add('seleccionado');
+
+    // Navegar al formulario con el tramo seleccionado
+    const url = `/revision-losas?project_id=${PROJECT_ID}`
+              + `&project=${encodeURIComponent(PROJECT_NAME)}`
+              + `&tramo_id=${idTramo}`
+              + `&tramo_nombre=${encodeURIComponent(nombreTramo)}`;
+
+    setTimeout(() => { window.location.href = url; }, 200);
+}
+</script>
+</body>
+</html>

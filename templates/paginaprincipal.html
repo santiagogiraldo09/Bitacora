@@ -34,14 +34,30 @@
                 <i class="fas fa-file-alt"></i> <!-- Ícono de hoja -->
                 <span>Formulario <br> Synchro Control</span>
             </a>
+            <!--
             <button class="menu-button" id="mantenimiento-btn">
-                <i class="fas fa-map-marker-alt"></i> <!-- Ícono de mapa -->
+                <i class="fas fa-map-marker-alt"></i>
                 <span>Reporte de recorrido</span>
-            </button>
+            </button> -->
+            <!-- Botón nuevo Ingeconcreto -->
+            <a href="#" class="a" id="ingeconcreto-btn">
+                <i class="fas fa-clipboard-check"></i>
+                <span>Revisión <br> de Losas</span>
+            </a>
+
+            <!-- Solo admin — Jinja condicional -->
+            {% if rol == 'admin' %}
+            <a href="/admin-tramos?project_id={{ project_id }}" class="a">
+                <i class="fas fa-images"></i>
+                <span>Gestionar<br>Tramos</span>
+            </a>
+            {% endif %}
+
+            <!--
             <button class="menu-button" id="pedido-btn">
-                <i class="fas fa-check-square"></i> <!-- Ícono de checklist -->
+                <i class="fas fa-check-square"></i>
                 <span>Reporte de pedido</span>
-            </button> 
+            </button> -->
         </div>
         <!-- Botón para eliminar proyecto -->
         <button id="delete-project-btn" class="delete-project-button">
@@ -211,20 +227,26 @@
     window.addEventListener("click", (event) => {
         if (event.target === fileModal) {
             fileModal.style.display = "none";
-    }
+        }
+    });
 
-    // Obtener el parámetro del proyecto de la URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const projectName = urlParams.get('project');
-    const projectId = urlParams.get('project_id');
-    
-    // Modificar el enlace al formulario de bitácora para incluir el proyecto
-    const bitacoraBtn = document.getElementById('bitacora-btn');
-    if (bitacoraBtn && projectName && projectId) {
-        bitacoraBtn.href = `/index?project_id=${projectId}&project=${encodeURIComponent(projectName)}`;
-        
-    }
+    // ✅ Actualizar hrefs CON project_id — va fuera del listener de click
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams   = new URLSearchParams(window.location.search);
+        const projectName = urlParams.get('project');
+        const projectId   = urlParams.get('project_id');
 
+        // Botón Reporte de Bitácora
+        const bitacoraBtn = document.getElementById('bitacora-btn');
+        if (bitacoraBtn && projectId) {
+            bitacoraBtn.href = `/index?project_id=${projectId}&project=${encodeURIComponent(projectName || '')}`;
+        }
+
+        // Botón Revisión de Losas (Ingeconcreto)
+        const ingeconcretoBtn = document.getElementById('ingeconcreto-btn');
+        if (ingeconcretoBtn && projectId) {
+            ingeconcretoBtn.href = `/seleccionar-tramo?project_id=${projectId}&project=${encodeURIComponent(projectName || '')}`;
+        }
     });
 
     // Mostrar el modal al hacer clic en el botón de eliminar

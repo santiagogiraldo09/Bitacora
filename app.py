@@ -616,28 +616,25 @@ def principalscreen():
 
 @app.route('/paginaprincipal')
 def paginaprincipal():
-    project_id = request.args.get('project_id')
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+
+    project_id   = request.args.get('project_id')
     project_name = request.args.get('project')
 
-    if not project_id:
-        return redirect(url_for('history')) # <--- AQUÍ ES DONDE TE ESTÁ MANDANDO
+    # Obtener rol del usuario en sesión
+    conn   = psycopg2.connect(**POSTGRES_CONFIG)
+    cursor = conn.cursor()
+    cursor.execute("SELECT rol FROM usuario WHERE user_id = %s",
+                   (session['user_id'],))
+    row = cursor.fetchone()
+    conn.close()
+    rol = row[0] if row else 'usuario'
 
-    try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
-        cursor = conn.cursor()
-        
-        # ASEGÚRATE DE QUE ESTE QUERY USE LA TABLA NUEVA
-        cursor.execute('SELECT * FROM proyectosTerranovus WHERE id_proyecto = %s', (project_id,))
-        proyecto = cursor.fetchone()
-        
-        if not proyecto:
-            # Si el ID existe en la URL pero no en la tabla, te manda a history
-            return redirect(url_for('history')) 
-
-        return render_template('paginaprincipal.html', project_id=project_id, project_name=project_name)
-    except Exception as e:
-        print(f"Error: {e}")
-        return redirect(url_for('history'))
+    return render_template('paginaprincipal.html',
+                           project_id=project_id,
+                           project_name=project_name,
+                           rol=rol)
 
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
@@ -1569,13 +1566,328 @@ def exportar_tablero_pdf_correo():
             conn.close()
 
 
+@app.route('/admin-tramos')
+def admin_tramos():
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+ 
+    # Verificar rol admin
+    conn = psycopg2.connect(**POSTGRES_CONFIG)
+    cursor = conn.cursor()
+    cursor.execute("SELECT rol FROM usuario WHERE user_id = %s", (session['user_id'],))
+    row = cursor.fetchone()
+    if not row or row[0] != 'admin':
+        conn.close()
+        return redirect(url_for('registros'))
+ 
+    project_id   = request.args.get('project_id')
+    project_info = None
+    tramos       = []
+ 
+    if project_id:
+        # Info del proyecto
+        cursor.execute("""
+            SELECT nombre_proyecto, cliente, contratista
+            FROM proyectosTerranovus WHERE id_proyecto = %s
+        """, (project_id,))
+        p = cursor.fetchone()
+        if p:
+            project_info = {'nombre': p[0], 'cliente': p[1], 'contratista': p[2]}
+ 
+        # Tramos del proyecto
+        cursor.execute("""
+            SELECT id_tramo, nombre, imagen_base64, created_at
+            FROM tramos_losa
+            WHERE id_proyecto = %s
+            ORDER BY created_at DESC
+        """, (project_id,))
+        rows = cursor.fetchall()
+        tramos = [
+            {'id_tramo': r[0], 'nombre': r[1],
+             'imagen_url': r[2], 'created_at': r[3]}
+            for r in rows
+        ]
+ 
+    conn.close()
+    return render_template('admin_tramos.html',
+                           project=project_info,
+                           project_id=project_id,
+                           tramos=tramos)
+
+
+@app.route('/subir-tramo', methods=['POST'])
+def subir_tramo():
+    if 'user_id' not in session:
+        return jsonify({"error": "Sesión no válida"}), 401
+
+    conn = psycopg2.connect(**POSTGRES_CONFIG)
+    cursor = conn.cursor()
+    cursor.execute("SELECT rol FROM usuario WHERE user_id = %s", (session['user_id'],))
+    row = cursor.fetchone()
+    if not row or row[0] != 'admin':
+        conn.close()
+        return jsonify({"error": "No autorizado"}), 403
+
+    try:
+        data       = request.get_json()
+        project_id = data.get('project_id')
+        nombre     = data.get('nombre', '').strip()
+        imagen_b64 = data.get('imagen')   # ya viene como data:image/...;base64,...
+
+        if not project_id or not nombre or not imagen_b64:
+            return jsonify({"error": "Faltan datos requeridos"}), 400
+
+        # Guardar base64 directo en BD
+        cursor.execute("""
+            INSERT INTO tramos_losa (id_proyecto, user_id, nombre, imagen_base64)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id_tramo, created_at
+        """, (project_id, session['user_id'], nombre, imagen_b64))
+        id_tramo, created_at = cursor.fetchone()
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "tramo": {
+                "id_tramo":   id_tramo,
+                "nombre":     nombre,
+                "imagen_url": imagen_b64,   # el frontend usa imagen_url para src
+                "created_at": created_at.strftime('%d/%m/%Y') if created_at else ''
+            }
+        }), 201
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error en /subir-tramo: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/eliminar-tramo', methods=['POST'])
+def eliminar_tramo():
+    if 'user_id' not in session:
+        return jsonify({"error": "Sesión no válida"}), 401
+
+    conn = psycopg2.connect(**POSTGRES_CONFIG)
+    cursor = conn.cursor()
+    cursor.execute("SELECT rol FROM usuario WHERE user_id = %s", (session['user_id'],))
+    row = cursor.fetchone()
+    if not row or row[0] != 'admin':
+        conn.close()
+        return jsonify({"error": "No autorizado"}), 403
+
+    try:
+        data     = request.get_json()
+        id_tramo = data.get('id_tramo')
+
+        if not id_tramo:
+            return jsonify({"error": "Falta id_tramo"}), 400
+
+        cursor.execute("DELETE FROM tramos_losa WHERE id_tramo = %s", (id_tramo,))
+        conn.commit()
+        return jsonify({"status": "success"}), 200
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error en /eliminar-tramo: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/seleccionar-tramo')
+def seleccionar_tramo():
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+ 
+    project_id   = request.args.get('project_id')
+    project_info = None
+    tramos       = []
+ 
+    conn = psycopg2.connect(**POSTGRES_CONFIG)
+    cursor = conn.cursor()
+ 
+    # Rol del usuario (para mostrar el link de cargar tramos si es admin)
+    cursor.execute("SELECT rol FROM usuario WHERE user_id = %s", (session['user_id'],))
+    rol_row = cursor.fetchone()
+    rol = rol_row[0] if rol_row else 'usuario'
+ 
+    if project_id:
+        cursor.execute("""
+            SELECT nombre_proyecto, cliente, contratista
+            FROM proyectosTerranovus WHERE id_proyecto = %s
+        """, (project_id,))
+        p = cursor.fetchone()
+        if p:
+            project_info = {'nombre': p[0], 'cliente': p[1], 'contratista': p[2]}
+ 
+        cursor.execute("""
+            SELECT id_tramo, nombre, imagen_base64, created_at
+            FROM tramos_losa
+            WHERE id_proyecto = %s
+            ORDER BY created_at DESC
+        """, (project_id,))
+        rows = cursor.fetchall()
+        tramos = [
+            {'id_tramo': r[0], 'nombre': r[1],
+             'imagen_url': r[2], 'created_at': r[3]}
+            for r in rows
+        ]
+ 
+    conn.close()
+    return render_template('seleccionar_tramo.html',
+                           project=project_info,
+                           project_id=project_id,
+                           tramos=tramos,
+                           rol=rol)
+
+
 @app.route('/revision-losas')
 def revision_losas():
     if 'user_id' not in session:
         return redirect(url_for('principalscreen'))
-    project_id = request.args.get('project_id')
-    # obtener project_info igual que en /index
-    return render_template('FormularioIngeconcreto.html', project=project_info)
+ 
+    project_id   = request.args.get('project_id')
+    tramo_id     = request.args.get('tramo_id')
+    project_info = None
+    tramo_info   = None
+ 
+    conn = psycopg2.connect(**POSTGRES_CONFIG)
+    cursor = conn.cursor()
+ 
+    if project_id:
+        cursor.execute("""
+            SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion
+            FROM proyectosTerranovus WHERE id_proyecto = %s
+        """, (project_id,))
+        row = cursor.fetchone()
+        if row:
+            project_info = {
+                'nombre':          row[0],
+                'cliente':         row[1],
+                'contratista':     row[2],
+                'orden_de_trabajo': row[3],
+                'ubicacion':       row[4]
+            }
+ 
+    if tramo_id:
+        cursor.execute("""
+            SELECT id_tramo, nombre, imagen_base64
+            FROM tramos_losa WHERE id_tramo = %s
+        """, (tramo_id,))
+        t = cursor.fetchone()
+        if t:
+            tramo_info = {'id_tramo': t[0], 'nombre': t[1], 'imagen_url': t[2]}
+ 
+    conn.close()
+    return render_template('FormularioIngeconcreto.html',
+                           project=project_info,
+                           tramo=tramo_info)
+
+@app.route('/historialRevisionLosas/<int:id_proyecto>')
+def historial_revision_losas(id_proyecto):
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+ 
+    conn = None
+    try:
+        conn   = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+ 
+        # ── 1. Info del proyecto ────────────────────────────
+        cursor.execute("""
+            SELECT nombre_proyecto, cliente, contratista
+            FROM proyectosTerranovus
+            WHERE id_proyecto = %s
+        """, (id_proyecto,))
+        proyecto = cursor.fetchone()
+ 
+        if not proyecto:
+            return redirect(url_for('history'))
+ 
+        # ── 2. Todos los encabezados de revisión ────────────
+        cursor.execute("""
+            SELECT
+                e.id_encabezado,
+                TO_CHAR(e.fecha_informe, 'DD/MM/YYYY') AS fecha_informe,
+                e.tipo,
+                e.proyecto,
+                e.contratista,
+                e.supervisor,
+                t.nombre        AS tramo_nombre,
+                t.imagen_base64 AS tramo_imagen
+            FROM revision_losas_encabezado e
+            LEFT JOIN tramos_losa t ON e.id_tramo = t.id_tramo
+            WHERE e.id_proyecto = %s
+            ORDER BY e.fecha_informe DESC, e.id_encabezado DESC
+        """, (id_proyecto,))
+        enc_rows = cursor.fetchall()
+ 
+        # ── 3. Para cada encabezado, traer su detalle ───────
+        revisiones = []
+        tramos_set = set()
+ 
+        for enc in enc_rows:
+            id_enc = enc[0]
+ 
+            cursor.execute("""
+                SELECT
+                    seccion,
+                    tramo,
+                    no_conformidad,
+                    TO_CHAR(fecha_registro, 'DD/MM/YYYY') AS fecha_registro,
+                    aceptacion,
+                    observaciones
+                FROM revision_losas_detalle
+                WHERE id_encabezado = %s
+                ORDER BY seccion, id_detalle
+            """, (id_enc,))
+            det_rows = cursor.fetchall()
+ 
+            detalle = [
+                {
+                    'seccion':        r[0],
+                    'tramo':          r[1],
+                    'no_conformidad': r[2],
+                    'fecha_registro': r[3],
+                    'aceptacion':     r[4],
+                    'observaciones':  r[5]
+                }
+                for r in det_rows
+            ]
+ 
+            tramo_nombre = enc[6]
+            if tramo_nombre:
+                tramos_set.add(tramo_nombre)
+ 
+            revisiones.append({
+                'id_encabezado': id_enc,
+                'fecha_informe': enc[1] or '—',
+                'tipo':          enc[2],
+                'proyecto':      enc[3],
+                'contratista':   enc[4],
+                'supervisor':    enc[5],
+                'tramo_nombre':  tramo_nombre,
+                'tramo_imagen':  enc[7],
+                'detalle':       detalle
+            })
+ 
+        return render_template(
+            'historialRevisionLosas.html',
+            proyecto      = proyecto,
+            revisiones    = revisiones,
+            tramos_count  = len(tramos_set),
+            id_proyecto   = id_proyecto
+        )
+ 
+    except Exception as e:
+        print(f"Error en historial_revision_losas: {e}")
+        traceback.print_exc()
+        return redirect(url_for('history'))
+    finally:
+        if conn:
+            conn.close()
+
 
 @app.route('/guardar_revision_losas', methods=['POST'])
 def guardar_revision_losas():
@@ -1583,22 +1895,22 @@ def guardar_revision_losas():
     try:
         data    = request.get_json()
         user_id = session.get('user_id')
-
+ 
         if not user_id:
             return jsonify({"status": "error", "error": "Sesión no válida"}), 401
-
+ 
         encabezado = data.get('encabezado', {})
         secciones  = data.get('secciones', {})
-
+ 
         conn   = psycopg2.connect(**POSTGRES_CONFIG)
         cursor = conn.cursor()
-
-        # 1. Insertar encabezado
+ 
+        # 1. Insertar encabezado (ahora incluye id_tramo)
         cursor.execute("""
             INSERT INTO revision_losas_encabezado
                 (id_proyecto, user_id, fecha_informe, tipo,
-                 proyecto, contratista, supervisor)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                 proyecto, contratista, supervisor, id_tramo)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id_encabezado
         """, (
             encabezado.get('project_id'),
@@ -1607,10 +1919,11 @@ def guardar_revision_losas():
             encabezado.get('tipo'),
             encabezado.get('proyecto'),
             encabezado.get('contratista'),
-            encabezado.get('supervisor')
+            encabezado.get('supervisor'),
+            encabezado.get('tramo_id')    or None
         ))
         id_encabezado = cursor.fetchone()[0]
-
+ 
         # 2. Insertar registros de cada sección
         for nombre_seccion, registros in secciones.items():
             for reg in registros:
@@ -1618,7 +1931,7 @@ def guardar_revision_losas():
                 if not any([reg.get('tramo'), reg.get('no_conformidad'),
                             reg.get('observaciones')]):
                     continue
-
+ 
                 cursor.execute("""
                     INSERT INTO revision_losas_detalle
                         (id_encabezado, seccion, tramo, fecha_registro,
@@ -1628,26 +1941,25 @@ def guardar_revision_losas():
                     id_encabezado,
                     nombre_seccion,
                     reg.get('tramo'),
-                    reg.get('fecha')          or None,
+                    reg.get('fecha')           or None,
                     reg.get('no_conformidad'),
                     reg.get('aceptacion', False),
                     reg.get('observaciones')
                 ))
-
+ 
         conn.commit()
         return jsonify({
             "status":        "success",
             "message":       "Revisión de losas guardada correctamente.",
             "id_encabezado": id_encabezado
         }), 201
-
+ 
     except Exception as e:
         if conn:
             conn.rollback()
         print(f"Error en /guardar_revision_losas: {e}")
         traceback.print_exc()
         return jsonify({"status": "error", "error": str(e)}), 500
-
     finally:
         if conn:
             conn.close()

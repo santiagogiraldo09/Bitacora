@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionar Tramos de Losa</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='FormularioIngeconcreto.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* ── Estilos exclusivos de esta pantalla ── */
+        .page-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #444;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 18px 18px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .page-title i { color: var(--naranja); }
+
+        .proyecto-badge {
+            background: var(--amarillo-claro);
+            border-left: 4px solid var(--amarillo);
+            padding: 10px 18px;
+            margin: 12px 18px 0;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #555;
+        }
+
+        .proyecto-badge strong { color: var(--naranja); }
+
+        /* ── Tarjeta de subida ── */
+        .upload-card {
+            margin: 18px 18px 0;
+            border: 2px dashed var(--amarillo);
+            border-radius: 10px;
+            padding: 20px;
+            background: var(--amarillo-claro);
+        }
+
+        .upload-card h3 {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--naranja);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .upload-grid .campo-full { grid-column: 1 / -1; }
+
+        .campo-grupo label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #666;
+            letter-spacing: 0.04em;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .campo-grupo input[type="text"],
+        .campo-grupo input[type="file"],
+        .campo-grupo textarea {
+            width: 100%;
+            border: 1px solid var(--gris-borde);
+            border-radius: 5px;
+            padding: 8px 10px;
+            font-size: 0.85rem;
+            font-family: 'Barlow', sans-serif;
+            background: var(--blanco);
+            color: var(--texto);
+        }
+
+        .campo-grupo input[type="file"] {
+            padding: 6px 8px;
+            cursor: pointer;
+        }
+
+        .btn-subir {
+            width: 100%;
+            padding: 11px;
+            background: var(--naranja);
+            color: white;
+            border: none;
+            border-radius: 7px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .btn-subir:hover { background: var(--naranja-hover); }
+        .btn-subir:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* ── Preview de imagen antes de subir ── */
+        #preview-container {
+            display: none;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        #preview-img {
+            max-width: 100%;
+            max-height: 180px;
+            border-radius: 6px;
+            border: 2px solid var(--amarillo);
+            object-fit: contain;
+        }
+
+        /* ── Lista de tramos existentes ── */
+        .tramos-section {
+            padding: 18px;
+        }
+
+        .tramos-section h3 {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #444;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tramos-section h3 i { color: var(--naranja); }
+
+        .tramo-card {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            background: var(--blanco);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .tramo-thumb {
+            width: 80px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
+        .tramo-info {
+            flex: 1;
+        }
+
+        .tramo-nombre {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #333;
+        }
+
+        .tramo-meta {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 3px;
+        }
+
+        .tramo-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .btn-ver-tramo, .btn-eliminar-tramo {
+            padding: 5px 12px;
+            border-radius: 5px;
+            border: none;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-family: 'Barlow', sans-serif;
+            transition: background 0.2s;
+        }
+
+        .btn-ver-tramo {
+            background: var(--amarillo-claro);
+            color: var(--naranja);
+            border: 1px solid var(--amarillo);
+        }
+
+        .btn-ver-tramo:hover { background: #ffe8b0; }
+
+        .btn-eliminar-tramo {
+            background: #fff0f0;
+            color: #cc3333;
+            border: 1px solid #ffcccc;
+        }
+
+        .btn-eliminar-tramo:hover { background: #ffe0e0; }
+
+        /* ── Sin tramos ── */
+        .empty-state {
+            text-align: center;
+            padding: 30px 20px;
+            color: #aaa;
+            font-size: 0.88rem;
+        }
+
+        .empty-state i {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 10px;
+            color: #ddd;
+        }
+
+        /* ── Modal de imagen ampliada ── */
+        .modal-imagen {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal-imagen.active { display: flex; }
+
+        .modal-imagen img {
+            max-width: 100%;
+            max-height: 85vh;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+
+        .modal-cerrar {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        /* ── Botón regresar ── */
+        .btn-regresar {
+            margin: 0 18px 20px;
+            padding: 11px 18px;
+            background: #f0f0f0;
+            color: #555;
+            border: none;
+            border-radius: 7px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            font-family: 'Barlow', sans-serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+            width: calc(100% - 36px);
+            justify-content: center;
+        }
+
+        .btn-regresar:hover { background: #e0e0e0; }
+
+        @media (max-width: 480px) {
+            .upload-grid { grid-template-columns: 1fr; }
+            .tramo-card { flex-wrap: wrap; }
+            .tramo-actions { flex-direction: row; }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+
+    <!-- Header -->
+    <div class="form-header">
+        <div class="header-left">
+            <div class="header-title">Gestionar Tramos de Losa</div>
+            <div class="header-subtitle">Panel de administración</div>
+        </div>
+        <div class="header-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo IAC">
+        </div>
+    </div>
+
+    <!-- Badge del proyecto -->
+    <div class="proyecto-badge">
+        <i class="fas fa-building"></i>
+        Proyecto: <strong>{{ project.nombre if project else 'N/A' }}</strong>
+        &nbsp;·&nbsp; ID: <strong>{{ project_id }}</strong>
+    </div>
+
+    <!-- ══ Tarjeta de subida ══ -->
+    <div class="upload-card">
+        <h3><i class="fas fa-cloud-upload-alt"></i> Subir nuevo tramo</h3>
+
+        <div class="upload-grid">
+            <div class="campo-grupo">
+                <label><i class="fas fa-tag"></i> Nombre del tramo</label>
+                <input type="text" id="input-nombre" placeholder="Ej: Tramo A-B Piso 2">
+            </div>
+            <div class="campo-grupo">
+                <label><i class="fas fa-image"></i> Imagen del tramo</label>
+                <input type="file" id="input-imagen" accept="image/*"
+                       onchange="previewImagen(this)">
+            </div>
+            <div class="campo-grupo campo-full" id="preview-container">
+                <label>Vista previa:</label>
+                <img id="preview-img" src="" alt="Vista previa">
+            </div>
+        </div>
+
+        <button class="btn-subir" id="btn-subir" onclick="subirTramo()">
+            <i class="fas fa-upload"></i> Guardar tramo
+        </button>
+    </div>
+
+    <!-- ══ Lista de tramos existentes ══ -->
+    <div class="tramos-section">
+        <h3><i class="fas fa-layer-group"></i> Tramos cargados</h3>
+
+        <div id="lista-tramos">
+            {% if tramos %}
+                {% for t in tramos %}
+                <div class="tramo-card" id="tramo-card-{{ t.id_tramo }}">
+                    <img class="tramo-thumb" src="{{ t.imagen_url }}"
+                         alt="{{ t.nombre }}"
+                         onclick="verImagen('{{ t.imagen_url }}', '{{ t.nombre }}')">
+                    <div class="tramo-info">
+                        <div class="tramo-nombre">{{ t.nombre }}</div>
+                        <div class="tramo-meta">
+                            <i class="fas fa-calendar-alt"></i>
+                            {{ t.created_at.strftime('%d/%m/%Y') if t.created_at else '' }}
+                        </div>
+                    </div>
+                    <div class="tramo-actions">
+                        <button class="btn-ver-tramo"
+                                onclick="verImagen('{{ t.imagen_url }}', '{{ t.nombre }}')">
+                            <i class="fas fa-eye"></i> Ver
+                        </button>
+                        <button class="btn-eliminar-tramo"
+                                onclick="eliminarTramo({{ t.id_tramo }})">
+                            <i class="fas fa-trash-alt"></i> Eliminar
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state" id="empty-state">
+                    <i class="fas fa-images"></i>
+                    Aún no hay tramos cargados para este proyecto.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Botón regresar -->
+    <button class="btn-regresar"
+            onclick="window.location.href='/paginaprincipal?project_id={{ project_id }}&project={{ project.nombre if project else '' }}'">
+        <i class="fas fa-arrow-left"></i> Regresar al proyecto
+    </button>
+
+</div><!-- /#app -->
+
+<!-- Modal imagen ampliada -->
+<div class="modal-imagen" id="modal-imagen">
+    <button class="modal-cerrar" onclick="cerrarModal()">
+        <i class="fas fa-times"></i>
+    </button>
+    <img id="modal-img" src="" alt="">
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+</div>
+
+<script>
+const PROJECT_ID = "{{ project_id }}";
+
+// ── Preview de imagen antes de subir ────────────────────────
+function previewImagen(input) {
+    const preview = document.getElementById('preview-container');
+    const img     = document.getElementById('preview-img');
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            img.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+// ── Subir tramo ──────────────────────────────────────────────
+async function subirTramo() {
+    const nombre = document.getElementById('input-nombre').value.trim();
+    const fileInput = document.getElementById('input-imagen');
+
+    if (!nombre) { alert('⚠️ Ingresa un nombre para el tramo.'); return; }
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert('⚠️ Selecciona una imagen.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-subir');
+    const overlay = document.getElementById('loading-overlay');
+    btn.disabled = true;
+    overlay.classList.add('active');
+
+    try {
+        // Convertir imagen a base64
+        const file = fileInput.files[0];
+        const base64 = await fileToBase64(file);
+
+        const response = await fetch('/subir-tramo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                project_id: PROJECT_ID,
+                nombre:     nombre,
+                imagen:     base64,
+                mime_type:  file.type
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            // Agregar la tarjeta al DOM sin recargar
+            agregarTarjetaDOM(result.tramo);
+            // Limpiar formulario
+            document.getElementById('input-nombre').value = '';
+            fileInput.value = '';
+            document.getElementById('preview-container').style.display = 'none';
+            document.getElementById('preview-img').src = '';
+            alert('✅ Tramo guardado correctamente.');
+        } else {
+            throw new Error(result.error || 'Error al guardar.');
+        }
+    } catch (err) {
+        alert('❌ Error: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        overlay.classList.remove('active');
+    }
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = e => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// ── Agregar tarjeta al DOM dinámicamente ─────────────────────
+function agregarTarjetaDOM(tramo) {
+    // Quitar el empty state si existe
+    const empty = document.getElementById('empty-state');
+    if (empty) empty.remove();
+
+    const lista = document.getElementById('lista-tramos');
+    const card  = document.createElement('div');
+    card.className = 'tramo-card';
+    card.id = `tramo-card-${tramo.id_tramo}`;
+    card.innerHTML = `
+        <img class="tramo-thumb" src="${tramo.imagen_url}"
+             alt="${tramo.nombre}"
+             onclick="verImagen('${tramo.imagen_url}', '${tramo.nombre}')">
+        <div class="tramo-info">
+            <div class="tramo-nombre">${tramo.nombre}</div>
+            <div class="tramo-meta">
+                <i class="fas fa-calendar-alt"></i> Hoy
+            </div>
+        </div>
+        <div class="tramo-actions">
+            <button class="btn-ver-tramo"
+                    onclick="verImagen('${tramo.imagen_url}', '${tramo.nombre}')">
+                <i class="fas fa-eye"></i> Ver
+            </button>
+            <button class="btn-eliminar-tramo"
+                    onclick="eliminarTramo(${tramo.id_tramo})">
+                <i class="fas fa-trash-alt"></i> Eliminar
+            </button>
+        </div>`;
+    lista.appendChild(card);
+}
+
+// ── Eliminar tramo ───────────────────────────────────────────
+async function eliminarTramo(idTramo) {
+    if (!confirm('¿Estás seguro de eliminar este tramo? Esta acción no se puede deshacer.')) return;
+
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.add('active');
+
+    try {
+        const response = await fetch('/eliminar-tramo', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ id_tramo: idTramo })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            document.getElementById(`tramo-card-${idTramo}`)?.remove();
+            // Si ya no hay tarjetas, mostrar empty state
+            const lista = document.getElementById('lista-tramos');
+            if (!lista.querySelector('.tramo-card')) {
+                lista.innerHTML = `
+                    <div class="empty-state" id="empty-state">
+                        <i class="fas fa-images"></i>
+                        Aún no hay tramos cargados para este proyecto.
+                    </div>`;
+            }
+        } else {
+            throw new Error(result.error || 'Error al eliminar.');
+        }
+    } catch (err) {
+        alert('❌ Error: ' + err.message);
+    } finally {
+        overlay.classList.remove('active');
+    }
+}
+
+// ── Modal de imagen ampliada ─────────────────────────────────
+function verImagen(url, nombre) {
+    document.getElementById('modal-img').src = url;
+    document.getElementById('modal-img').alt = nombre;
+    document.getElementById('modal-imagen').classList.add('active');
+}
+
+function cerrarModal() {
+    document.getElementById('modal-imagen').classList.remove('active');
+}
+
+// Cerrar modal al hacer clic fuera de la imagen
+document.getElementById('modal-imagen').addEventListener('click', function(e) {
+    if (e.target === this) cerrarModal();
+});
+</script>
+</body>
+</html>
