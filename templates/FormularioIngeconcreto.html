@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revisión de Losas — INGECONCRETO</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='FormularioIngeconcreto.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+<div id="app">
+
+    <!-- ══════════════════════════════════════════════════════
+         HEADER
+    ══════════════════════════════════════════════════════ -->
+    <div class="form-header">
+        <div class="header-left">
+            <div class="header-title">Revisión de Losas</div>
+            <div class="header-subtitle">NATURE AQUA · Constructora CAPITAL</div>
+        </div>
+        <div class="header-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo IAC">
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         BARRA DE INFORMACIÓN DEL PROYECTO
+    ══════════════════════════════════════════════════════ -->
+    <div class="project-info-bar">
+
+        <!-- Selector: Plataforma / Piso / Página -->
+        <div class="tipo-selector-row">
+            <label class="tipo-label"><i class="fas fa-layer-group"></i> Tipo:</label>
+
+            <label class="tipo-option">
+                <input type="radio" name="tipo_revision" value="plataforma" checked>
+                <span class="tipo-btn">Plataforma</span>
+            </label>
+
+            <label class="tipo-option">
+                <input type="radio" name="tipo_revision" value="piso">
+                <span class="tipo-btn">Piso</span>
+            </label>
+
+            <label class="tipo-option">
+                <input type="radio" name="tipo_revision" value="pagina">
+                <span class="tipo-btn">Página</span>
+            </label>
+        </div>
+
+        <div class="info-field">
+            <label><i class="fas fa-building"></i> Proyecto</label>
+            <input type="text" id="info-proyecto"
+                   placeholder="Nombre del proyecto"
+                   value="{{ project.nombre if project else '' }}">
+        </div>
+
+        <div class="info-field">
+            <label><i class="fas fa-user-hard-hat"></i> Contratista</label>
+            <input type="text" id="info-contratista"
+                   placeholder="Constructora"
+                   value="{{ project.contratista if project else '' }}">
+        </div>
+
+        <div class="info-field">
+            <label><i class="fas fa-user-tie"></i> Supervisor Técnico</label>
+            <input type="text" id="info-supervisor" placeholder="Nombre del supervisor">
+        </div>
+
+        <div class="info-field">
+            <label><i class="fas fa-calendar-day"></i> Fecha del informe</label>
+            <input type="date" id="info-fecha">
+        </div>
+
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         CUERPO DEL FORMULARIO
+    ══════════════════════════════════════════════════════ -->
+    <div class="form-body">
+
+        <!-- ─────────────────────────────────────────────────
+             SECCIÓN 1: FORMALETA
+        ───────────────────────────────────────────────── -->
+        <div class="seccion-inspeccion" id="sec-formaleta">
+            <div class="seccion-header">
+                <span><i class="fas fa-border-all seccion-icon"></i> &nbsp;Formaleta</span>
+            </div>
+            <div class="registros-container" id="registros-formaleta"></div>
+            <button class="btn-agregar-registro" onclick="agregarRegistro('formaleta')">
+                <i class="fas fa-plus-circle"></i> Agregar registro
+            </button>
+        </div>
+
+        <!-- ─────────────────────────────────────────────────
+             SECCIÓN 2: ACERO VIGAS
+        ───────────────────────────────────────────────── -->
+        <div class="seccion-inspeccion" id="sec-acero-vigas">
+            <div class="seccion-header">
+                <span><i class="fas fa-grip-lines seccion-icon"></i> &nbsp;Acero Vigas</span>
+            </div>
+            <div class="registros-container" id="registros-acero-vigas"></div>
+            <button class="btn-agregar-registro" onclick="agregarRegistro('acero-vigas')">
+                <i class="fas fa-plus-circle"></i> Agregar registro
+            </button>
+        </div>
+
+        <!-- ─────────────────────────────────────────────────
+             SECCIÓN 3: ACERO NERVIOS
+        ───────────────────────────────────────────────── -->
+        <div class="seccion-inspeccion" id="sec-acero-nervios">
+            <div class="seccion-header">
+                <span><i class="fas fa-stream seccion-icon"></i> &nbsp;Acero Nervios</span>
+            </div>
+            <div class="registros-container" id="registros-acero-nervios"></div>
+            <button class="btn-agregar-registro" onclick="agregarRegistro('acero-nervios')">
+                <i class="fas fa-plus-circle"></i> Agregar registro
+            </button>
+        </div>
+
+        <!-- ─────────────────────────────────────────────────
+             SECCIÓN 4: MALLA
+        ───────────────────────────────────────────────── -->
+        <div class="seccion-inspeccion" id="sec-malla">
+            <div class="seccion-header">
+                <span><i class="fas fa-th seccion-icon"></i> &nbsp;Malla</span>
+            </div>
+            <div class="registros-container" id="registros-malla"></div>
+            <button class="btn-agregar-registro" onclick="agregarRegistro('malla')">
+                <i class="fas fa-plus-circle"></i> Agregar registro
+            </button>
+        </div>
+
+        <!-- ─────────────────────────────────────────────────
+             SECCIÓN 5: CONCRETO
+        ───────────────────────────────────────────────── -->
+        <div class="seccion-inspeccion" id="sec-concreto">
+            <div class="seccion-header">
+                <span><i class="fas fa-fill-drip seccion-icon"></i> &nbsp;Concreto</span>
+            </div>
+            <div class="registros-container" id="registros-concreto"></div>
+            <button class="btn-agregar-registro" onclick="agregarRegistro('concreto')">
+                <i class="fas fa-plus-circle"></i> Agregar registro
+            </button>
+        </div>
+
+        <!-- ── Botones de acción ─────────────────────────── -->
+        <div class="form-actions">
+            <button class="btn-regresar" onclick="history.back()">
+                <i class="fas fa-arrow-left"></i> Regresar
+            </button>
+            <button class="btn-guardar" onclick="guardarFormulario()">
+                <i class="fas fa-save"></i> Guardar Formulario
+            </button>
+        </div>
+
+    </div><!-- /.form-body -->
+
+</div><!-- /#app -->
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CATÁLOGOS DE NO CONFORMIDAD POR SECCIÓN
+// ═══════════════════════════════════════════════════════════
+
+const NC_OPCIONES = {
+    'formaleta': [
+        { codigo: 'F1', desc: 'Limpieza de fondo' },
+        { codigo: 'F2', desc: 'Picado de fondo' },
+        { codigo: 'F3', desc: 'Localización' },
+        { codigo: 'F4', desc: 'Dimensiones' },
+        { codigo: 'F5', desc: 'Cota de fondo' },
+        { codigo: 'F6', desc: 'Limpieza' },
+        { codigo: 'F7', desc: 'Verticalidad' },
+        { codigo: 'F8', desc: 'Estabilidad' },
+        { codigo: 'F9', desc: 'Otros' }
+    ],
+    'acero-vigas': [
+        { codigo: 'R1', desc: 'Cantidad' },
+        { codigo: 'R2', desc: 'Diámetro' },
+        { codigo: 'R3', desc: 'Longitud' },
+        { codigo: 'R4', desc: 'Posición' },
+        { codigo: 'R5', desc: 'Fijación' },
+        { codigo: 'R6', desc: 'Traslapos' },
+        { codigo: 'R7', desc: 'Recubrimiento' },
+        { codigo: 'R8', desc: 'Otros' }
+    ],
+    'acero-nervios': [
+        { codigo: 'R1', desc: 'Cantidad' },
+        { codigo: 'R2', desc: 'Diámetro' },
+        { codigo: 'R3', desc: 'Longitud' },
+        { codigo: 'R4', desc: 'Posición' },
+        { codigo: 'R5', desc: 'Fijación' },
+        { codigo: 'R6', desc: 'Traslapos' },
+        { codigo: 'R7', desc: 'Recubrimiento' },
+        { codigo: 'R8', desc: 'Otros' }
+    ],
+    'malla': [
+        { codigo: 'E2', desc: 'Apariencia superficial' },
+        { codigo: 'E3', desc: 'Alineamientos' },
+        { codigo: 'E4', desc: 'Defectos por reparar' },
+        { codigo: 'E5', desc: 'Fisuras' },
+        { codigo: 'E6', desc: 'Protección impactos' },
+        { codigo: 'E7', desc: 'Sobrecargas' },
+        { codigo: 'E8', desc: 'Deterioro' }
+    ],
+    'concreto': [
+        { codigo: 'C1', desc: 'Dosificación' },
+        { codigo: 'C2', desc: 'Mezclado' },
+        { codigo: 'C3', desc: 'Transporte' },
+        { codigo: 'C4', desc: 'Disposición en sitio' },
+        { codigo: 'C5', desc: 'Asentamiento' },
+        { codigo: 'C6', desc: 'Homogeneidad' },
+        { codigo: 'C7', desc: 'Altura de descarga' },
+        { codigo: 'C8', desc: 'Vibrado' },
+        { codigo: 'C9', desc: 'Protección por clima' },
+        { codigo: 'C10', desc: 'Curado' }
+    ]
+};
+
+// Contadores por sección
+const contadores = {
+    'formaleta': 0,
+    'acero-vigas': 0,
+    'acero-nervios': 0,
+    'malla': 0,
+    'concreto': 0
+};
+
+// ═══════════════════════════════════════════════════════════
+//  CONSTRUIR SELECT DE NO CONFORMIDADES
+// ═══════════════════════════════════════════════════════════
+function buildNcSelect(seccion, uid) {
+    const opciones = NC_OPCIONES[seccion] || [];
+    let opts = `<option value="">— Selecciona NC —</option>
+                <option value="ninguna">Sin no conformidad</option>`;
+    opciones.forEach(op => {
+        opts += `<option value="${op.codigo}">${op.codigo} – ${op.desc}</option>`;
+    });
+    return `
+        <select id="nc-${uid}" class="nc-select">
+            ${opts}
+        </select>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AGREGAR REGISTRO A UNA SECCIÓN
+// ═══════════════════════════════════════════════════════════
+function agregarRegistro(seccion) {
+    contadores[seccion]++;
+    const n   = contadores[seccion];
+    const uid = `${seccion}-${n}`;
+    const contenedor = document.getElementById(`registros-${seccion}`);
+
+    // IDs únicos para los campos de voz
+    const obsId  = `obs-${uid}`;
+    const tramId = `tram-${uid}`;
+
+    const card = document.createElement('div');
+    card.className = 'registro-card';
+    card.setAttribute('data-uid', uid);
+
+    card.innerHTML = `
+        <div class="registro-card-header">
+            <span class="registro-num">Registro #${n}</span>
+            <button class="btn-eliminar-registro" onclick="eliminarRegistro(this, '${seccion}')"
+                ${n > 1 ? 'style="display:flex;"' : ''}>
+                <i class="fas fa-trash-alt"></i> Eliminar
+            </button>
+        </div>
+
+        <div class="registro-grid">
+
+            <!-- Tramo -->
+            <div class="campo-grupo">
+                <label><i class="fas fa-map-marker-alt"></i> Tramo</label>
+                <div class="input-voz">
+                    <input type="text" id="${tramId}" placeholder="Ej: Tramo A-B" class="campo-tramo">
+                    <button class="record-btn" data-target-input="${tramId}" title="Dictar">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" data-target-input="${tramId}" title="Detener"
+                        style="display:none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Fecha -->
+            <div class="campo-grupo">
+                <label><i class="fas fa-calendar-day"></i> Fecha</label>
+                <input type="date" class="campo-fecha">
+            </div>
+
+            <!-- No Conformidad -->
+            <div class="campo-grupo">
+                <label><i class="fas fa-exclamation-circle"></i> No Conformidad</label>
+                ${buildNcSelect(seccion, uid)}
+            </div>
+
+            <!-- Aceptación -->
+            <div class="campo-grupo">
+                <label><i class="fas fa-check-square"></i> Aceptación</label>
+                <div class="aceptacion-wrapper">
+                    <input type="checkbox" id="acepta-${uid}" class="campo-aceptacion">
+                    <label for="acepta-${uid}" class="aceptacion-btn">
+                        <span class="check-icon"><i class="fas fa-check"></i></span>
+                        Aceptado
+                    </label>
+                </div>
+            </div>
+
+            <!-- Observaciones (ancho completo) -->
+            <div class="campo-grupo campo-full">
+                <label><i class="fas fa-comment-alt"></i> Observaciones</label>
+                <div class="input-voz">
+                    <textarea id="${obsId}" class="campo-obs" rows="2"
+                        placeholder="Observaciones (continuar en el reverso si es necesario)..."></textarea>
+                    <button class="record-btn" data-target-input="${obsId}" title="Dictar">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" data-target-input="${obsId}" title="Detener"
+                        style="display:none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+            </div>
+
+        </div><!-- /.registro-grid -->
+    `;
+
+    contenedor.appendChild(card);
+
+    // Enlazar botones de voz de la tarjeta recién creada
+    card.querySelectorAll('.record-btn').forEach(btn => {
+        btn.addEventListener('click', () => iniciarVozCampo(btn));
+    });
+    card.querySelectorAll('.stop-btn').forEach(btn => {
+        btn.addEventListener('click', () => detenerVozCampo(btn));
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ELIMINAR REGISTRO
+// ═══════════════════════════════════════════════════════════
+function eliminarRegistro(btnEl, seccion) {
+    const card = btnEl.closest('.registro-card');
+    card.remove();
+
+    // Renumerar
+    const contenedor = document.getElementById(`registros-${seccion}`);
+    contenedor.querySelectorAll('.registro-card').forEach((c, i) => {
+        c.querySelector('.registro-num').textContent = `Registro #${i + 1}`;
+        // Solo mostrar el botón eliminar cuando hay más de 1
+        const btn = c.querySelector('.btn-eliminar-registro');
+        btn.style.display = contenedor.children.length > 1 ? 'flex' : 'none';
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  VOZ — DICTADO POR CAMPO
+//  Compatible con el patrón de script.js existente
+// ═══════════════════════════════════════════════════════════
+let currentVozRecognition = null;
+
+function iniciarVozCampo(btn) {
+    const targetId = btn.getAttribute('data-target-input');
+    const targetEl = document.getElementById(targetId);
+    if (!targetEl) return;
+
+    // Detener reconocimiento previo si existe
+    if (currentVozRecognition) {
+        currentVozRecognition.stop();
+        currentVozRecognition = null;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert('Tu navegador no soporta reconocimiento de voz. Usa Chrome.');
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+    currentVozRecognition = recognition;
+    recognition.lang           = 'es-CO';
+    recognition.interimResults = false;
+    recognition.continuous     = false;
+
+    // UI: ocultar mic, mostrar stop
+    const stopBtn = btn.closest('.input-voz').querySelector('.stop-btn');
+    btn.style.display    = 'none';
+    stopBtn.style.display = 'flex';
+    targetEl.style.outline = '2px solid #FFAF33';
+
+    recognition.onresult = (e) => {
+        const texto = e.results[0][0].transcript;
+        // Si el campo ya tiene texto, agregar con espacio
+        if (targetEl.value) {
+            targetEl.value += ' ' + texto;
+        } else {
+            targetEl.value = texto;
+        }
+    };
+
+    recognition.onend = () => {
+        btn.style.display     = 'flex';
+        stopBtn.style.display  = 'none';
+        targetEl.style.outline = '';
+        currentVozRecognition  = null;
+    };
+
+    recognition.onerror = (err) => {
+        console.error('Error voz:', err.error);
+        btn.style.display     = 'flex';
+        stopBtn.style.display  = 'none';
+        targetEl.style.outline = '';
+        currentVozRecognition  = null;
+    };
+
+    stopBtn.onclick = () => { recognition.stop(); };
+
+    recognition.start();
+}
+
+function detenerVozCampo(btn) {
+    if (currentVozRecognition) {
+        currentVozRecognition.stop();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RECOPILAR DATOS DEL FORMULARIO
+// ═══════════════════════════════════════════════════════════
+function recopilarFormulario() {
+    const urlParams  = new URLSearchParams(window.location.search);
+    const projectId  = urlParams.get('project_id');
+    const tipoRadio  = document.querySelector('input[name="tipo_revision"]:checked');
+
+    const encabezado = {
+        project_id:  projectId,
+        tipo:        tipoRadio ? tipoRadio.value : null,
+        proyecto:    document.getElementById('info-proyecto').value.trim(),
+        contratista: document.getElementById('info-contratista').value.trim(),
+        supervisor:  document.getElementById('info-supervisor').value.trim(),
+        fecha:       document.getElementById('info-fecha').value
+    };
+
+    const secciones = {};
+
+    ['formaleta', 'acero-vigas', 'acero-nervios', 'malla', 'concreto'].forEach(sec => {
+        const cards = document.querySelectorAll(`#registros-${sec} .registro-card`);
+        secciones[sec] = [];
+
+        cards.forEach(card => {
+            secciones[sec].push({
+                tramo:        card.querySelector('.campo-tramo')?.value.trim()    || '',
+                fecha:        card.querySelector('.campo-fecha')?.value            || '',
+                no_conformidad: card.querySelector('.nc-select')?.value           || '',
+                aceptacion:   card.querySelector('.campo-aceptacion')?.checked    || false,
+                observaciones: card.querySelector('.campo-obs')?.value.trim()     || ''
+            });
+        });
+    });
+
+    return { encabezado, secciones };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GUARDAR FORMULARIO
+// ═══════════════════════════════════════════════════════════
+async function guardarFormulario() {
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.add('active');
+
+    try {
+        const payload = recopilarFormulario();
+
+        // Validación mínima
+        const tieneDatos = Object.values(payload.secciones).some(sec =>
+            sec.some(r => r.tramo || r.observaciones || r.no_conformidad)
+        );
+
+        if (!tieneDatos && !payload.encabezado.proyecto) {
+            alert('⚠️ Completa al menos un campo antes de guardar.');
+            overlay.classList.remove('active');
+            return;
+        }
+
+        const response = await fetch('/guardar_revision_losas', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert('✅ ' + (result.message || 'Revisión guardada correctamente.'));
+            window.location.href = '/registros';
+        } else {
+            throw new Error(result.error || 'Error al guardar.');
+        }
+
+    } catch (err) {
+        alert('❌ Error: ' + err.message);
+    } finally {
+        overlay.classList.remove('active');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INICIALIZACIÓN
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    // Fecha por defecto: hoy
+    const hoy = new Date().toISOString().split('T')[0];
+    document.getElementById('info-fecha').value = hoy;
+
+    // Crear el primer registro en cada sección al cargar
+    ['formaleta', 'acero-vigas', 'acero-nervios', 'malla', 'concreto'].forEach(sec => {
+        agregarRegistro(sec);
+    });
+});
+</script>
+</body>
+</html>

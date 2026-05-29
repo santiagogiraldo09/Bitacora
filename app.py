@@ -1569,6 +1569,90 @@ def exportar_tablero_pdf_correo():
             conn.close()
 
 
+@app.route('/revision-losas')
+def revision_losas():
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+    project_id = request.args.get('project_id')
+    # obtener project_info igual que en /index
+    return render_template('FormularioIngeconcreto.html', project=project_info)
+
+@app.route('/guardar_revision_losas', methods=['POST'])
+def guardar_revision_losas():
+    conn = None
+    try:
+        data    = request.get_json()
+        user_id = session.get('user_id')
+
+        if not user_id:
+            return jsonify({"status": "error", "error": "Sesión no válida"}), 401
+
+        encabezado = data.get('encabezado', {})
+        secciones  = data.get('secciones', {})
+
+        conn   = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+
+        # 1. Insertar encabezado
+        cursor.execute("""
+            INSERT INTO revision_losas_encabezado
+                (id_proyecto, user_id, fecha_informe, tipo,
+                 proyecto, contratista, supervisor)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id_encabezado
+        """, (
+            encabezado.get('project_id'),
+            user_id,
+            encabezado.get('fecha')       or None,
+            encabezado.get('tipo'),
+            encabezado.get('proyecto'),
+            encabezado.get('contratista'),
+            encabezado.get('supervisor')
+        ))
+        id_encabezado = cursor.fetchone()[0]
+
+        # 2. Insertar registros de cada sección
+        for nombre_seccion, registros in secciones.items():
+            for reg in registros:
+                # Saltar filas completamente vacías
+                if not any([reg.get('tramo'), reg.get('no_conformidad'),
+                            reg.get('observaciones')]):
+                    continue
+
+                cursor.execute("""
+                    INSERT INTO revision_losas_detalle
+                        (id_encabezado, seccion, tramo, fecha_registro,
+                         no_conformidad, aceptacion, observaciones)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    id_encabezado,
+                    nombre_seccion,
+                    reg.get('tramo'),
+                    reg.get('fecha')          or None,
+                    reg.get('no_conformidad'),
+                    reg.get('aceptacion', False),
+                    reg.get('observaciones')
+                ))
+
+        conn.commit()
+        return jsonify({
+            "status":        "success",
+            "message":       "Revisión de losas guardada correctamente.",
+            "id_encabezado": id_encabezado
+        }), 201
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Error en /guardar_revision_losas: {e}")
+        traceback.print_exc()
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/eliminar-proyecto', methods=['POST'])
 def eliminar_proyecto():
     if 'user_id' not in session:

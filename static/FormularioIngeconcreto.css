@@ -1,0 +1,529 @@
+/* ================================================================
+   FormularioIngeconcreto.css
+   Revisión de Losas — INGECONCRETO / IAC
+   Paleta: naranja #FF6600, amarillo #FFAF33, blanco, grises
+================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap');
+
+/* ── Reset & base ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --naranja:      #FF6600;
+    --naranja-hover:#e05800;
+    --amarillo:     #FFAF33;
+    --amarillo-claro:#fff3dc;
+    --gris-bg:      #f5f5f5;
+    --gris-borde:   #ccc;
+    --gris-header:  #444;
+    --blanco:       #ffffff;
+    --texto:        #222;
+    --sombra:       0 2px 8px rgba(0,0,0,0.10);
+    --radio:        8px;
+    --font-main:    'Barlow', sans-serif;
+    --font-cond:    'Barlow Condensed', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+    font-family: var(--font-main);
+    background: var(--gris-bg);
+    color: var(--texto);
+    min-height: 100vh;
+    padding: 20px 12px 40px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+/* ── Contenedor principal ──────────────────────────────────── */
+#app {
+    width: 100%;
+    max-width: 720px;
+    background: var(--blanco);
+    border-radius: 12px;
+    box-shadow: var(--sombra);
+    overflow: hidden;
+}
+
+/* ── HEADER ────────────────────────────────────────────────── */
+.form-header {
+    background: var(--naranja);
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0;
+}
+
+.header-left {
+    padding: 14px 18px;
+}
+
+.header-title {
+    font-family: var(--font-cond);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--blanco);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.1;
+}
+
+.header-subtitle {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.85);
+    margin-top: 2px;
+}
+
+.header-logo {
+    background: var(--blanco);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px;
+    min-width: 110px;
+}
+
+.header-logo img {
+    max-width: 90px;
+    max-height: 50px;
+    object-fit: contain;
+    display: block;
+}
+
+/* ── INFO del proyecto ─────────────────────────────────────── */
+.project-info-bar {
+    background: #fff8f0;
+    border-bottom: 2px solid var(--amarillo);
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+}
+
+.info-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.info-field label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--naranja);
+    letter-spacing: 0.05em;
+}
+
+.info-field input, .info-field select {
+    border: 1px solid var(--gris-borde);
+    border-radius: 5px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    font-family: var(--font-main);
+    background: var(--blanco);
+    color: var(--texto);
+    width: 100%;
+}
+
+.info-field input:focus, .info-field select:focus {
+    outline: 2px solid var(--amarillo);
+    border-color: var(--amarillo);
+}
+
+/* Fila para los selectores de tipo (Plataforma / Piso / Página) */
+.tipo-selector-row {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.tipo-selector-row label.tipo-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--naranja);
+    letter-spacing: 0.05em;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+.tipo-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.tipo-option input[type="radio"] { display: none; }
+
+.tipo-option .tipo-btn {
+    padding: 6px 16px;
+    border: 2px solid var(--gris-borde);
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #666;
+    background: var(--blanco);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: var(--font-main);
+    user-select: none;
+}
+
+.tipo-option input[type="radio"]:checked + .tipo-btn {
+    border-color: var(--naranja);
+    background: var(--naranja);
+    color: var(--blanco);
+}
+
+.tipo-option .tipo-btn:hover {
+    border-color: var(--amarillo);
+    background: var(--amarillo-claro);
+    color: var(--naranja);
+}
+
+/* ── CUERPO del formulario ─────────────────────────────────── */
+.form-body { padding: 20px 18px 30px; }
+
+/* ── Sección de ítem (Formaleta, Acero vigas, etc.) ────────── */
+.seccion-inspeccion {
+    margin-bottom: 28px;
+    border-radius: var(--radio);
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.seccion-header {
+    background: var(--gris-header);
+    color: var(--blanco);
+    font-family: var(--font-cond);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 9px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.seccion-header .seccion-icon {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+/* ── Tarjeta de registro dentro de cada sección ────────────── */
+.registro-card {
+    background: var(--blanco);
+    border-top: 1px solid #f0f0f0;
+    padding: 14px 16px;
+}
+
+.registro-card:not(:first-child) {
+    border-top: 2px dashed #eee;
+}
+
+.registro-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.registro-num {
+    font-family: var(--font-cond);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--naranja);
+    letter-spacing: 0.06em;
+    border-left: 3px solid var(--naranja);
+    padding-left: 8px;
+}
+
+.btn-eliminar-registro {
+    background: none;
+    border: none;
+    color: #cc3333;
+    cursor: pointer;
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    transition: background 0.2s;
+    display: none;  /* Visible solo si hay más de 1 registro */
+}
+
+.btn-eliminar-registro:hover { background: #ffeaea; }
+
+/* Grid de campos del registro */
+.registro-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.campo-full { grid-column: 1 / -1; }
+
+/* ── Labels y campos ───────────────────────────────────────── */
+.campo-grupo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.campo-grupo label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #666;
+    letter-spacing: 0.04em;
+}
+
+.campo-grupo input[type="text"],
+.campo-grupo input[type="date"],
+.campo-grupo select,
+.campo-grupo textarea {
+    border: 1px solid var(--gris-borde);
+    border-radius: 5px;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    font-family: var(--font-main);
+    background: #fafafa;
+    color: var(--texto);
+    width: 100%;
+    transition: border-color 0.2s, outline 0.2s;
+}
+
+.campo-grupo input:focus,
+.campo-grupo select:focus,
+.campo-grupo textarea:focus {
+    outline: 2px solid var(--amarillo);
+    border-color: var(--amarillo);
+    background: var(--blanco);
+}
+
+.campo-grupo textarea {
+    resize: vertical;
+    min-height: 64px;
+}
+
+/* ── Input con ícono de micrófono ──────────────────────────── */
+.input-voz {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.input-voz textarea,
+.input-voz input[type="text"] {
+    flex: 1;
+}
+
+.record-btn, .stop-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    margin: 0;
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s ease;
+    font-size: 14px;
+    align-self: flex-end;
+    margin-bottom: 2px;
+}
+
+.record-btn {
+    background: transparent;
+    color: var(--naranja);
+    font-size: 18px;
+    border: 1px solid #ddd;
+}
+
+.record-btn:hover { background: #fff0e5; }
+
+.stop-btn {
+    background: #e74c3c;
+    color: white;
+    font-size: 14px;
+}
+
+.stop-btn:hover { background: #c0392b; }
+
+/* ── Aceptación (checkbox) ─────────────────────────────────── */
+.aceptacion-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.aceptacion-wrapper input[type="checkbox"] {
+    display: none;
+}
+
+.aceptacion-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 2px solid var(--gris-borde);
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--blanco);
+    color: #666;
+    transition: all 0.2s ease;
+    user-select: none;
+    font-family: var(--font-main);
+}
+
+.aceptacion-btn:hover {
+    border-color: #28a745;
+    background: #f0fff4;
+    color: #28a745;
+}
+
+.aceptacion-wrapper input[type="checkbox"]:checked + .aceptacion-btn {
+    border-color: #28a745;
+    background: #28a745;
+    color: var(--blanco);
+}
+
+.aceptacion-wrapper input[type="checkbox"]:checked + .aceptacion-btn .check-icon::before {
+    content: '✓ ';
+}
+
+/* ── Botón "Agregar registro" ──────────────────────────────── */
+.btn-agregar-registro {
+    width: 100%;
+    padding: 9px;
+    background: var(--amarillo-claro);
+    border: 2px dashed var(--amarillo);
+    border-radius: 0 0 var(--radio) var(--radio);
+    color: var(--naranja);
+    font-weight: 700;
+    font-size: 0.82rem;
+    font-family: var(--font-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.btn-agregar-registro:hover {
+    background: #ffe8b0;
+}
+
+/* ── Botones de acción finales ─────────────────────────────── */
+.form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+.btn-guardar {
+    flex: 1;
+    padding: 13px;
+    background: var(--naranja);
+    color: var(--blanco);
+    border: none;
+    border-radius: var(--radio);
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: var(--font-cond);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-guardar:hover { background: var(--naranja-hover); }
+
+.btn-regresar {
+    padding: 13px 20px;
+    background: #f0f0f0;
+    color: #555;
+    border: none;
+    border-radius: var(--radio);
+    font-size: 0.88rem;
+    font-weight: 600;
+    font-family: var(--font-main);
+    cursor: pointer;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-regresar:hover { background: #e0e0e0; }
+
+/* ── Loading overlay ───────────────────────────────────────── */
+.loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-overlay.active { display: flex; }
+
+.spinner {
+    width: 46px;
+    height: 46px;
+    border: 5px solid rgba(255,255,255,0.3);
+    border-top-color: var(--amarillo);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 540px) {
+    body { padding: 10px 6px 30px; }
+
+    .project-info-bar {
+        grid-template-columns: 1fr;
+    }
+
+    .tipo-selector-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .registro-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-actions { flex-direction: column; }
+
+    .btn-regresar { width: 100%; justify-content: center; }
+}
